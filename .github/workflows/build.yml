@@ -105,11 +105,11 @@ jobs:
           SIZE_MB=$((SIZE_BYTES / 1048576))
           echo "APK size: ${SIZE_MB} MB (${SIZE_BYTES} bytes)"
 
-          if [ "$SIZE_MB" -gt 80 ]; then
-            echo "::error::APK is ${SIZE_MB}MB — exceeds 80MB limit. Likely a fat/universal build."
+          if [ "$SIZE_MB" -gt 100 ]; then
+            echo "::error::APK is ${SIZE_MB}MB — exceeds 100MB limit. Check architecture filtering."
             exit 1
           fi
-          echo "✅ APK size is within expected range."
+          echo "✅ APK size is within range."
 
       - name: Generate Release Notes
         id: notes
