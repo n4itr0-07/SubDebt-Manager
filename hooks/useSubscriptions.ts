@@ -39,9 +39,9 @@ export const useSubscriptions = () => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const loadSubscriptions = useCallback(() => {
+  const loadSubscriptions = useCallback(async () => {
     try {
-      const raw = storage.getString(STORAGE_KEYS.SUBSCRIPTIONS);
+      const raw = await storage.getString(STORAGE_KEYS.SUBSCRIPTIONS);
       if (raw) {
         const parsed = JSON.parse(raw);
         setSubscriptions(parsed);

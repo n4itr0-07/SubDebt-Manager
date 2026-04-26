@@ -1,7 +1,7 @@
+import { useTheme } from '../hooks/useTheme';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
 import { borderRadius, typography } from '../constants/typography';
 
 type BadgeVariant = 'active' | 'expiring' | 'expired' | 'paid' | 'pending';
@@ -30,6 +30,8 @@ export const GlassBadge: React.FC<GlassBadgeProps> = ({
   text,
   showIcon = true,
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const config = variantStyles[variant];
   const displayText = text || config.text;
   const variantStyle = styles[variant];
@@ -49,7 +51,7 @@ export const GlassBadge: React.FC<GlassBadgeProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

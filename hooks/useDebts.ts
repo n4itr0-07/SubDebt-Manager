@@ -34,9 +34,9 @@ export const useDebts = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const loadDebts = useCallback(() => {
+  const loadDebts = useCallback(async () => {
     try {
-      const raw = storage.getString(STORAGE_KEYS.DEBTS);
+      const raw = await storage.getString(STORAGE_KEYS.DEBTS);
       if (raw) {
         const parsed = JSON.parse(raw);
         setDebts(parsed);

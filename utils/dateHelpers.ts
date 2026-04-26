@@ -1,10 +1,14 @@
 export const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
+  return date.toLocaleDateString('en-IN', {
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
   });
+};
+
+export const formatShortDate = (date: Date): string => {
+  return date.toLocaleDateString('en-IN');
 };
 
 export const formatDateRelative = (dateString: string): string => {
@@ -55,11 +59,18 @@ export const getProgressPercentage = (startDate: string, expiryDate: string): nu
   return Math.round((elapsed / total) * 100);
 };
 
-export const formatCurrency = (amount: number, currency: string = 'INR'): string => {
-  if (currency === 'INR') {
-    return `₹${amount.toLocaleString('en-IN')}`;
+export const formatCurrency = (amount: number, currencyCode: string = 'INR'): string => {
+  try {
+    const { getCurrencyByCode } = require('../constants/currencies');
+    const currency = getCurrencyByCode(currencyCode);
+    const formatted = amount.toLocaleString(currency.locale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    return `${currency.symbol}${formatted}`;
+  } catch {
+    return `${currencyCode} ${amount.toLocaleString()}`;
   }
-  return `${currency} ${amount.toLocaleString()}`;
 };
 
 export const getCurrentDateISO = (): string => {

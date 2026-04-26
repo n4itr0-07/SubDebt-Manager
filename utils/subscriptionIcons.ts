@@ -6,6 +6,7 @@ export type IconKey =
   | 'netflix' | 'youtube' | 'spotify' | 'chatgpt' | 'claude'
   | 'github' | 'notion' | 'figma' | 'adobe' | 'disney'
   | 'amazon' | 'applemusic' | 'googleone' | 'microsoft'
+  | 'gemini' | 'google' | 'copilot'
   // Streaming
   | 'primevideo' | 'hotstar' | 'hbo' | 'hulu' | 'sonyliv'
   | 'zee5' | 'jiocinema' | 'crunchyroll'
@@ -23,7 +24,7 @@ export type IconKey =
   // Education
   | 'duolingo' | 'coursera' | 'udemy'
   // Indian Telecom
-  | 'jio' | 'airtel' | 'vi'
+  | 'jio' | 'airtel' | 'vi' | 'bsnl'
   // Indian Services
   | 'swiggy' | 'zomato' | 'timesprime'
   // Cloud & Dev

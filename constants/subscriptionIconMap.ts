@@ -37,6 +37,9 @@ export const subscriptionIconMap: Record<string, string> = {
   gpt: 'chatgpt',
   claude: 'claude',
   anthropic: 'claude',
+  gemini: 'gemini',
+  google: 'google',
+  copilot: 'copilot',
   
   // Dev & Productivity
   github: 'github',
@@ -105,6 +108,7 @@ export const subscriptionIconMap: Record<string, string> = {
   vi: 'vi',
   vodafone: 'vi',
   'vodafone idea': 'vi',
+  bsnl: 'bsnl',
   
   // Indian Services
   swiggy: 'swiggy',

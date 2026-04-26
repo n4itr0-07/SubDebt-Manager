@@ -1,3 +1,4 @@
+import { useTheme } from '../hooks/useTheme';
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import Animated, { 
@@ -5,7 +6,6 @@ import Animated, {
   withSpring,
   interpolateColor,
 } from 'react-native-reanimated';
-import { colors } from '../constants/colors';
 import { borderRadius, typography, spacing } from '../constants/typography';
 
 interface FilterOption {
@@ -26,6 +26,8 @@ export const GlassPillFilter: React.FC<GlassPillFilterProps> = ({
   selected, 
   onSelect,
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return (
     <View style={styles.container}>
       {options.map((option) => {
@@ -54,7 +56,7 @@ export const GlassPillFilter: React.FC<GlassPillFilterProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     gap: spacing.sm,

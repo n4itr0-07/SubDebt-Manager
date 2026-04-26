@@ -1,3 +1,4 @@
+import { useTheme } from '../../hooks/useTheme';
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -10,19 +11,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AmbientBackground } from '../../components/AmbientBackground';
 import { GlassButton } from '../../components/GlassButton';
 import { AppPopup } from '../../components/AppPopup';
+import { CurrencyPicker } from '../../components/CurrencyPicker';
 import { exportAllData } from '../../utils/exportData';
 import { pickAndImportData, clearAllData } from '../../utils/importData';
 import { useDebts } from '../../hooks/useDebts';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
-import { colors } from '../../constants/colors';
+import { useCurrency } from '../../hooks/useCurrency';
+import { storage } from '../../storage/mmkv';
+import { STORAGE_KEYS } from '../../storage/keys';
+import Constants from 'expo-constants';
 
 export default function SettingsModal() {
+  const { colors, mode, setMode } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { refresh: refreshDebts } = useDebts();
   const { refresh: refreshSubs } = useSubscriptions();
+  const { currency, setCurrency: setSelectedCurrency } = useCurrency();
   
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   // Popup state
   const [popupVisible, setPopupVisible] = useState(false);
@@ -117,6 +126,18 @@ export default function SettingsModal() {
     });
   };
 
+  const handleResetOnboarding = async () => {
+    await storage.set(STORAGE_KEYS.HAS_SEEN_ONBOARDING, 'false');
+    showPopup({
+      title: 'Onboarding Reset',
+      message: 'Onboarding slides will be shown next time you open the app.',
+      icon: 'refresh-circle-outline',
+      iconColor: colors.accent.blue,
+      confirmText: 'OK',
+      onConfirm: closePopup,
+    });
+  };
+
   const handleClearAll = () => {
     showPopup({
       title: 'Clear All Data?',
@@ -138,8 +159,8 @@ export default function SettingsModal() {
           confirmText: 'Yes, Delete',
           isDestructive: true,
           onCancel: closePopup,
-          onConfirm: () => {
-            clearAllData(); refreshDebts(); refreshSubs();
+          onConfirm: async () => {
+            await clearAllData(); refreshDebts(); refreshSubs();
             closePopup();
             setTimeout(() => showPopup({
               title: 'Data Cleared',
@@ -155,6 +176,11 @@ export default function SettingsModal() {
     });
   };
 
+  const handleCurrencySelect = (code: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedCurrency(code);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <AmbientBackground />
@@ -166,6 +192,48 @@ export default function SettingsModal() {
         <View style={{ width: 36 }} />
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
+        {/* Appearance Section */}
+        <Text style={styles.sectionTitle}>APPEARANCE</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardDesc}>Choose your preferred app theme.</Text>
+          <View style={styles.themeRow}>
+            {['light', 'system', 'dark'].map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.themeBtn, mode === t && styles.themeBtnActive]}
+                onPress={() => setMode(t as any)}
+              >
+                <Text style={[styles.themeBtnText, mode === t && styles.themeBtnTextActive]}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Currency Section */}
+        <Text style={styles.sectionTitle}>CURRENCY</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardDesc}>Select your default currency for displaying amounts.</Text>
+          <TouchableOpacity
+            style={styles.currencySelector}
+            onPress={() => setShowCurrencyPicker(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.currencyLeft}>
+              <Text style={styles.currencyFlag}>{currency.flag}</Text>
+              <View>
+                <Text style={styles.currencyCode}>{currency.code}</Text>
+                <Text style={styles.currencyName}>{currency.name}</Text>
+              </View>
+            </View>
+            <View style={styles.currencyRight}>
+              <Text style={styles.currencySymbol}>{currency.symbol}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.sectionTitle}>BACKUP & RESTORE</Text>
         <View style={styles.card}>
           <Text style={styles.cardDesc}>Export your data to a JSON file for backup or transfer.</Text>
@@ -199,25 +267,40 @@ export default function SettingsModal() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>DANGER ZONE</Text>
-        <View style={[styles.card, { borderColor: 'rgba(239,83,80,0.2)' }]}>
-          <View style={styles.dangerRow}>
-            <Ionicons name="warning-outline" size={20} color={colors.accent.red} />
+        {/* Danger Zone */}
+        <Text style={[styles.sectionTitle, { color: colors.accent.red }]}>DANGER ZONE</Text>
+        <View style={styles.card}>
+          <TouchableOpacity style={styles.dangerRow} onPress={handleResetOnboarding}>
+            <Ionicons name="refresh-circle-outline" size={22} color={colors.accent.red} />
+            <Text style={styles.dangerLabel}>Reset Onboarding</Text>
+          </TouchableOpacity>
+          <Text style={styles.cardDesc}>Show the intro slides again on next app start.</Text>
+          
+          <View style={{ height: 16 }} />
+          
+          <TouchableOpacity style={styles.dangerRow} onPress={handleClearAll}>
+            <Ionicons name="trash-outline" size={22} color={colors.accent.red} />
             <Text style={styles.dangerLabel}>Clear All Data</Text>
-          </View>
-          <Text style={styles.cardDesc}>Permanently delete all subscriptions and debts.</Text>
-          <GlassButton title="Clear All Data" variant="danger" onPress={handleClearAll} size="large" />
+          </TouchableOpacity>
+          <Text style={styles.cardDesc}>Permanently delete all your subscriptions and debts.</Text>
         </View>
 
         <Text style={styles.sectionTitle}>ABOUT</Text>
         <View style={styles.card}>
           <View style={styles.aboutRow}><Text style={styles.aboutLabel}>App</Text><Text style={styles.aboutValue}>SubDebt</Text></View>
-          <View style={styles.aboutRow}><Text style={styles.aboutLabel}>Version</Text><Text style={styles.aboutValue}>1.0.0</Text></View>
+          <View style={styles.aboutRow}><Text style={styles.aboutLabel}>Version</Text><Text style={styles.aboutValue}>{Constants.expoConfig?.version || '1.0.0'}</Text></View>
           <View style={styles.aboutRow}><Text style={styles.aboutLabel}>Storage</Text><Text style={styles.aboutValue}>Local Device</Text></View>
-          <View style={[styles.aboutRow, { borderBottomWidth: 0 }]}><Text style={styles.aboutLabel}>Currency</Text><Text style={styles.aboutValue}>₹ INR</Text></View>
+          <View style={[styles.aboutRow, { borderBottomWidth: 0 }]}><Text style={styles.aboutLabel}>Currency</Text><Text style={styles.aboutValue}>{currency.symbol} {currency.code}</Text></View>
         </View>
         <Text style={styles.footer}>Your data is securely stored locally on this device.</Text>
       </ScrollView>
+
+      <CurrencyPicker
+        visible={showCurrencyPicker}
+        selectedCode={currency.code}
+        onSelect={handleCurrencySelect}
+        onClose={() => setShowCurrencyPicker(false)}
+      />
 
       <AppPopup 
         visible={popupVisible}
@@ -235,26 +318,93 @@ export default function SettingsModal() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0c0c14' },
+const getStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background.primary },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.glass.card, justifyContent: 'center', alignItems: 'center' },
   title: { color: colors.text.primary, fontSize: 18, fontWeight: '700' },
   content: { padding: 16, paddingBottom: 40 },
-  sectionTitle: { color: '#ffffff', fontSize: 13, fontWeight: '700', letterSpacing: 1, marginTop: 24, marginBottom: 12 },
-  card: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 16, marginBottom: 16 },
-  cardDesc: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 16, lineHeight: 20 },
+  sectionTitle: { color: colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 1, marginTop: 24, marginBottom: 12 },
+  card: { backgroundColor: colors.glass.buttonSecondary, borderWidth: 1, borderColor: colors.glass.navBorder, borderRadius: 16, padding: 16, marginBottom: 16 },
+  cardDesc: { color: colors.text.secondary, fontSize: 14, marginBottom: 16, lineHeight: 20 },
+
+  // Currency Selector
+  currencySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.glass.card,
+    borderWidth: 0.5,
+    borderColor: colors.glass.cardBorder,
+    borderRadius: 14,
+    padding: 14,
+  },
+  currencyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  currencyFlag: {
+    fontSize: 28,
+  },
+  currencyCode: {
+    color: colors.text.primary,
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  currencyName: {
+    color: colors.text.muted,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  currencyRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  currencySymbol: {
+    color: colors.accent.blue,
+    fontSize: 22,
+    fontWeight: '700',
+  },
+
   importRow: { flexDirection: 'row', gap: 12 },
-  importBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center' },
+  importBtn: { flex: 1, backgroundColor: colors.glass.card, borderWidth: 1, borderColor: colors.glass.cardBorder, borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center' },
   importBtnDanger: { borderColor: 'rgba(239,83,80,0.2)' },
   iconBox: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   importTextWrap: { alignItems: 'center' },
   importLabel: { color: colors.accent.blue, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  importSub: { color: 'rgba(255,255,255,0.4)', fontSize: 12, textAlign: 'center' },
+  importSub: { color: colors.text.muted, fontSize: 12, textAlign: 'center' },
   dangerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   dangerLabel: { color: colors.accent.red, fontSize: 16, fontWeight: '600' },
-  aboutRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  aboutLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 15, flex: 1 },
-  aboutValue: { color: '#ffffff', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'right' },
-  footer: { color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center', marginTop: 32, marginBottom: 20 },
+  aboutRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.glass.inputBorder },
+  aboutLabel: { color: colors.text.secondary, fontSize: 15, flex: 1 },
+  aboutValue: { color: colors.text.primary, fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'right' },
+  footer: { color: colors.text.tertiary, fontSize: 13, textAlign: 'center', marginTop: 32, marginBottom: 20 },
+
+  themeRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.glass.input,
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: colors.glass.inputBorder,
+  },
+  themeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  themeBtnActive: {
+    backgroundColor: colors.glass.cardBorder,
+  },
+  themeBtnText: {
+    color: colors.text.muted,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  themeBtnTextActive: {
+    color: colors.text.primary,
+  },
 });

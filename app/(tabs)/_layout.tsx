@@ -3,8 +3,12 @@ import { View, StyleSheet } from 'react-native';
 import { Tabs } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { FloatingNavBar } from '../../components/FloatingNavBar';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function TabsLayout() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+  
   return (
     <GestureHandlerRootView style={styles.container}>
       <Tabs
@@ -19,9 +23,9 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0c0c14',
+    backgroundColor: colors.background.primary,
   },
 });

@@ -1,7 +1,7 @@
+import { useTheme } from '../hooks/useTheme';
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, TouchableOpacityProps, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../constants/colors';
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -14,6 +14,8 @@ interface GlassButtonProps extends TouchableOpacityProps {
 }
 
 export const GlassButton: React.FC<GlassButtonProps> = ({ title, variant = 'primary', size = 'medium', leftIcon, rightIcon, style, ...props }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const content = (
     <View style={[styles.content, size === 'small' && styles.sm, size === 'large' && styles.lg]}>
       {leftIcon}
@@ -38,17 +40,17 @@ export const GlassButton: React.FC<GlassButtonProps> = ({ title, variant = 'prim
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   btn: { borderRadius: 14, overflow: 'hidden' },
   btnPrimary: { elevation: 4 },
-  btnSecondary: { backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' },
+  btnSecondary: { backgroundColor: colors.glass.card, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' },
   btnDanger: { backgroundColor: 'rgba(239,83,80,0.12)', borderWidth: 0.5, borderColor: 'rgba(239,83,80,0.3)' },
   btnGhost: { backgroundColor: 'transparent' },
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 8 },
   sm: { paddingHorizontal: 12, paddingVertical: 8 },
   lg: { paddingHorizontal: 24, paddingVertical: 15 },
   text: { fontSize: 15, fontWeight: '600' },
-  text_primary: { color: '#fff' },
+  text_primary: { color: colors.text.primary },
   text_secondary: { color: colors.text.primary },
   text_danger: { color: colors.accent.red },
   text_ghost: { color: colors.text.muted },

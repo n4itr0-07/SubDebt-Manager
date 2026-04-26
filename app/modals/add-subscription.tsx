@@ -1,3 +1,4 @@
+import { useTheme } from '../../hooks/useTheme';
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -13,8 +14,11 @@ import { GlassInput } from '../../components/GlassInput';
 import { GlassButton } from '../../components/GlassButton';
 import { SubscriptionIcon } from '../../components/SubscriptionIcon';
 import { AmbientBackground } from '../../components/AmbientBackground';
+import { CurrencyPicker } from '../../components/CurrencyPicker';
 import { useSubscriptions, BillingCycle } from '../../hooks/useSubscriptions';
-import { colors } from '../../constants/colors';
+import { useCurrency } from '../../hooks/useCurrency';
+import { formatShortDate } from '../../utils/dateHelpers';
+import { getCurrencyByCode } from '../../constants/currencies';
 import { typography, spacing } from '../../constants/typography';
 
 const billingCycles: { key: BillingCycle; label: string }[] = [
@@ -26,17 +30,21 @@ const billingCycles: { key: BillingCycle; label: string }[] = [
 
 const categories = [
   'Entertainment', 'Productivity', 'Utilities', 'Gaming',
-  'Health & Fitness', 'News & Reading', 'Other',
+  'Health & Fitness', 'News & Reading', 'AI', 'Dev Tools', 'Recharges', 'Other',
 ];
 
 export default function AddSubscriptionModal() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { addSubscription } = useSubscriptions();
   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('INR');
+  const { currencyCode: defaultCurrency } = useCurrency();
+  const [currency, setCurrency] = useState(defaultCurrency);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [category, setCategory] = useState('');
   const [startDate, setStartDate] = useState(new Date());
@@ -98,9 +106,9 @@ export default function AddSubscriptionModal() {
             </View>
             <View style={styles.currBox}>
               <Text style={styles.fieldLabel}>Currency</Text>
-              <View style={styles.currPill}>
-                <Text style={styles.currText}>{currency}</Text>
-              </View>
+              <TouchableOpacity style={styles.currPill} onPress={() => setShowCurrencyPicker(true)} activeOpacity={0.7}>
+                <Text style={styles.currText}>{getCurrencyByCode(currency).symbol} {currency}</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -126,12 +134,12 @@ export default function AddSubscriptionModal() {
           <TouchableOpacity style={styles.dateRow} onPress={() => setShowStartPicker(true)}>
             <Ionicons name="calendar-outline" size={18} color={colors.accent.blue} />
             <Text style={styles.dateLabel}>Start Date</Text>
-            <Text style={styles.dateValue}>{startDate.toLocaleDateString()}</Text>
+            <Text style={styles.dateValue}>{formatShortDate(startDate)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.dateRow, errors.expiryDate && { borderColor: colors.accent.red }]} onPress={() => setShowExpiryPicker(true)}>
             <Ionicons name="calendar-outline" size={18} color={colors.accent.blue} />
             <Text style={styles.dateLabel}>Expiry Date</Text>
-            <Text style={styles.dateValue}>{expiryDate.toLocaleDateString()}</Text>
+            <Text style={styles.dateValue}>{formatShortDate(expiryDate)}</Text>
           </TouchableOpacity>
           {errors.expiryDate && <Text style={styles.errorText}>{errors.expiryDate}</Text>}
 
@@ -149,6 +157,12 @@ export default function AddSubscriptionModal() {
         onCancel={() => setShowStartPicker(false)}
         date={startDate}
       />
+      <CurrencyPicker
+        visible={showCurrencyPicker}
+        selectedCode={currency}
+        onSelect={setCurrency}
+        onClose={() => setShowCurrencyPicker(false)}
+      />
       <DateTimePickerModal
         isVisible={showExpiryPicker} mode="date"
         themeVariant="dark"
@@ -160,15 +174,15 @@ export default function AddSubscriptionModal() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0c0c14' },
+const getStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8,
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.glass.card, justifyContent: 'center', alignItems: 'center',
   },
   title: { color: colors.text.primary, fontSize: 18, fontWeight: '700' },
   content: { padding: 16, paddingBottom: 40 },
@@ -176,12 +190,12 @@ const styles = StyleSheet.create({
   iconHint: { color: colors.text.muted, fontSize: 12, marginTop: 8, textAlign: 'center' },
   row: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   amountCol: { flex: 1 },
-  currBox: { width: 90, marginBottom: 14 },
+  currBox: { width: 110, marginBottom: 14 },
   fieldLabel: { color: colors.text.secondary, fontSize: 13, marginBottom: 8, fontWeight: '500' },
   currPill: {
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)', borderRadius: 14,
+    backgroundColor: colors.glass.card, borderWidth: 0.5,
+    borderColor: colors.glass.cardBorder, borderRadius: 14,
     height: 48,
   },
   currText: { color: colors.text.primary, fontSize: 15 },
@@ -192,8 +206,8 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.glass.card, borderWidth: 0.5,
+    borderColor: colors.glass.buttonSecondary,
   },
   chipSmall: { paddingHorizontal: 10, paddingVertical: 6 },
   chipActive: { backgroundColor: 'rgba(79,195,247,0.15)', borderColor: 'rgba(79,195,247,0.4)' },
@@ -204,8 +218,8 @@ const styles = StyleSheet.create({
   chipTextCatActive: { color: colors.accent.purple, fontWeight: '600' },
   dateRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)', borderRadius: 14,
+    backgroundColor: colors.glass.card, borderWidth: 0.5,
+    borderColor: colors.glass.cardBorder, borderRadius: 14,
     paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8,
   },
   dateLabel: { color: colors.text.secondary, fontSize: 14, flex: 1 },

@@ -35,23 +35,81 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Prebuild Expo Android
         run: npx expo prebuild --platform android --clean
 
-      - name: Force arm64-v8a Architecture
+      - name: Optimize Build for arm64-only
         run: |
-          sed -i 's/def enableSeparateBuildPerCPUArchitecture = false/def enableSeparateBuildPerCPUArchitecture = true/g' android/app/build.gradle
-          sed -i 's/ndk {/ndk {\n            abiFilters "arm64-v8a"/g' android/app/build.gradle || true
+          GRADLE_FILE="android/app/build.gradle"
+
+          # Enable Proguard/R8 Shrinking (CRITICAL for size reduction)
+          sed -i 's/def enableProguardInReleaseBuilds = false/def enableProguardInReleaseBuilds = true/g' "$GRADLE_FILE"
+
+          # Append a guaranteed arm64-only filter block at the end of build.gradle
+          # This overrides any existing ABI config and forces ONLY arm64-v8a
+          cat >> "$GRADLE_FILE" << 'GRADLE_PATCH'
+
+          // === CI: Force arm64-v8a only ===
+          android {
+              defaultConfig {
+                  ndk {
+                      abiFilters "arm64-v8a"
+                  }
+              }
+              splits {
+                  abi {
+                      enable false
+                  }
+              }
+          }
+          GRADLE_PATCH
+
+          echo "--- Verifying build.gradle tail ---"
+          tail -20 "$GRADLE_FILE"
 
       - name: Build Release APK
         run: |
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --no-daemon \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
 
       - name: Rename APK
         run: |
-          mv android/app/build/outputs/apk/release/app-arm64-v8a-release.apk SubDebt-arm64.apk || \
-          mv android/app/build/outputs/apk/release/app-release.apk SubDebt-arm64.apk || echo "APK not found where expected"
+          echo "--- APK output listing ---"
+          ls -lh android/app/build/outputs/apk/release/
+
+          # Pick whichever APK exists (split name or default name)
+          APK=$(find android/app/build/outputs/apk/release/ -name "*.apk" ! -name "*unsigned*" | head -1)
+
+          if [ -z "$APK" ]; then
+            echo "::error::No release APK found!"
+            exit 1
+          fi
+
+          mv "$APK" SubDebt-arm64.apk
+          echo "Renamed $APK → SubDebt-arm64.apk"
+
+      - name: Verify APK Size
+        run: |
+          SIZE_BYTES=$(stat -c%s SubDebt-arm64.apk)
+          SIZE_MB=$((SIZE_BYTES / 1048576))
+          echo "APK size: ${SIZE_MB} MB (${SIZE_BYTES} bytes)"
+
+          if [ "$SIZE_MB" -gt 80 ]; then
+            echo "::error::APK is ${SIZE_MB}MB — exceeds 80MB limit. Likely a fat/universal build."
+            exit 1
+          fi
+          echo "✅ APK size is within expected range."
 
       - name: Generate Release Notes
         id: notes
@@ -59,13 +117,13 @@ jobs:
           echo "## 🚀 SubDebt Production Release" > release_notes.md
           echo "" >> release_notes.md
           echo "### 🔥 What's New" >> release_notes.md
-          echo "- **Advanced Subscription Tracking**: Automated icons, dynamic expiration progress bars, and custom billing cycle calculations." >> release_notes.md
-          echo "- **Intelligent Debt Manager**: Track money owed to you with visual overdue warnings and one-tap payment marking." >> release_notes.md
-          echo "- **Production MMKV Storage**: Upgraded to true C++ \`react-native-mmkv\` for blazing fast, synchronous data access." >> release_notes.md
-          echo "- **Data Portability**: Full JSON backup and restore system with intelligent merge & replace options." >> release_notes.md
-          echo "- **Premium Glassmorphism UX**: Completely custom UI with interactive haptics, spring physics splash screen, and custom bottom-sheet alerts." >> release_notes.md
+          echo "- **Dynamic Light/Dark Theme**: Complete architectural shift to a themeable UI. Includes a persistent toggle in settings and full system-theme synchronization." >> release_notes.md
+          echo "- **Onboarding Experience**: New professional 3-slide walkthrough for first-time users with smooth spring animations and haptic feedback." >> release_notes.md
+          echo "- **Massive Icon Expansion**: Added 40+ high-fidelity brand icons including Indian Telecom (Jio, Airtel, Vi), AI (Gemini, Claude), and Local Services (Swiggy, Zomato)." >> release_notes.md
+          echo "- **Refined Glassmorphism UX**: Improved card visibility in light mode with higher opacity, custom shadows, and a theme-aware floating navigation bar." >> release_notes.md
+          echo "- **Data Portability**: Full JSON backup/restore system and a new 'Reset Onboarding' utility for developers." >> release_notes.md
           echo "" >> release_notes.md
-          echo "> 📱 **Note**: This is an \`arm64-v8a\` optimized APK build." >> release_notes.md
+          echo "> 📱 **Note**: This is an optimized \`arm64-v8a\` APK build with R8 code shrinking and ProGuard enabled for maximum performance." >> release_notes.md
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

@@ -1,3 +1,4 @@
+import { useTheme } from '../hooks/useTheme';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -5,7 +6,6 @@ import * as Haptics from 'expo-haptics';
 import { SubscriptionIcon } from './SubscriptionIcon';
 import { GlassBadge } from './GlassBadge';
 import { Subscription } from '../hooks/useSubscriptions';
-import { colors } from '../constants/colors';
 import { formatCurrency, formatDateRelative, getDaysRemaining, isExpired, isExpiringSoon, getProgressPercentage } from '../utils/dateHelpers';
 
 interface SubscriptionCardProps {
@@ -14,6 +14,8 @@ interface SubscriptionCardProps {
 }
 
 export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({ subscription, onDelete }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const daysRemaining = getDaysRemaining(subscription.expiryDate);
   const expired = isExpired(subscription.expiryDate);
   const expiringSoon = isExpiringSoon(subscription.expiryDate);
@@ -68,15 +70,15 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({ subscription
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   card: {
     marginHorizontal: 20,
     marginBottom: 10,
     padding: 16,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: colors.glass.card,
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glass.cardBorder,
   },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   titleBox: { flex: 1, marginLeft: 12 },
@@ -89,7 +91,7 @@ const styles = StyleSheet.create({
   datesBox: { alignItems: 'flex-end' },
   dateText: { color: colors.text.secondary, fontSize: 13 },
   daysLeft: { color: colors.text.muted, fontSize: 11, marginTop: 2 },
-  progressBar: { height: 3, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden', marginBottom: 6 },
+  progressBar: { height: 3, backgroundColor: colors.glass.card, borderRadius: 2, overflow: 'hidden', marginBottom: 6 },
   progressFill: { height: '100%', backgroundColor: '#66BB6A', borderRadius: 2 },
   desc: { color: colors.text.muted, fontSize: 13, lineHeight: 18 },
 });

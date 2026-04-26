@@ -1,10 +1,10 @@
+import { useTheme } from '../hooks/useTheme';
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../constants/colors';
 
 interface TabConfig {
   key: string;
@@ -32,6 +32,8 @@ const tabs: TabConfig[] = [
 ];
 
 export const FloatingNavBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const insets = useSafeAreaInsets();
 
   return (
@@ -67,7 +69,7 @@ export const FloatingNavBar: React.FC<BottomTabBarProps> = ({ state, descriptors
               <Ionicons
                 name={(isFocused ? tabConfig.activeIcon : tabConfig.icon) as any}
                 size={21}
-                color={isFocused ? '#4FC3F7' : 'rgba(255,255,255,0.35)'}
+                color={isFocused ? colors.accent.blue : colors.text.placeholder}
               />
               <Text style={[styles.label, isFocused && styles.labelActive]}>
                 {tabConfig.label}
@@ -80,17 +82,21 @@ export const FloatingNavBar: React.FC<BottomTabBarProps> = ({ state, descriptors
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     position: 'absolute',
     left: 20,
     right: 20,
     height: 58,
     borderRadius: 29,
-    backgroundColor: 'rgba(16,16,28,0.95)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.glass.nav,
+    borderWidth: 1,
+    borderColor: colors.glass.navBorder,
     elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   inner: {
     flex: 1,
@@ -110,15 +116,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   tabActive: {
-    backgroundColor: 'rgba(79,195,247,0.1)',
+    backgroundColor: colors.accent.blue + '1A',
   },
   label: {
-    color: 'rgba(255,255,255,0.35)',
+    color: colors.text.placeholder,
     fontSize: 13,
     fontWeight: '500',
   },
   labelActive: {
-    color: '#4FC3F7',
+    color: colors.accent.blue,
     fontWeight: '600',
   },
 });

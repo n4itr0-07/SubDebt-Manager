@@ -1,3 +1,4 @@
+import { useTheme } from '../hooks/useTheme';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { getSubscriptionIcon, IconKey } from '../utils/subscriptionIcons';
@@ -17,8 +18,8 @@ import {
   JioIcon, AirtelIcon, ViIcon,
   SwiggyIcon, ZomatoIcon, TimesPrimeIcon,
   AwsIcon, VercelIcon, CloudflareIcon, DigitalOceanIcon,
+  GeminiIcon, GoogleIcon, CopilotIcon, BsnlIcon,
 } from './icons';
-import { colors } from '../constants/colors';
 
 interface SubscriptionIconProps {
   name: string;
@@ -45,16 +46,19 @@ const iconMap: Record<IconKey, React.FC<{ size?: number }>> = {
   expressvpn: ExpressVpnIcon, surfshark: SurfsharkIcon,
   protonvpn: ProtonVpnIcon, duolingo: DuolingoIcon,
   coursera: CourseraIcon, udemy: UdemyIcon,
-  jio: JioIcon, airtel: AirtelIcon, vi: ViIcon,
+  jio: JioIcon, airtel: AirtelIcon, vi: ViIcon, bsnl: BsnlIcon,
   swiggy: SwiggyIcon, zomato: ZomatoIcon, timesprime: TimesPrimeIcon,
   aws: AwsIcon, vercel: VercelIcon, cloudflare: CloudflareIcon,
   digitalocean: DigitalOceanIcon,
+  gemini: GeminiIcon, google: GoogleIcon, copilot: CopilotIcon,
 };
 
 export const SubscriptionIcon: React.FC<SubscriptionIconProps> = ({ 
   name, 
   size = 44 
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const result = getSubscriptionIcon(name);
 
   if (result.type === 'brand' && result.iconKey && iconMap[result.iconKey]) {
@@ -87,7 +91,7 @@ export const SubscriptionIcon: React.FC<SubscriptionIconProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.glass.input,
     borderWidth: 1,

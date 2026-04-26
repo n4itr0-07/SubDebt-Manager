@@ -1,6 +1,6 @@
+import { useTheme } from '../hooks/useTheme';
 import React, { useState } from 'react';
 import { TextInput, TextInputProps, StyleSheet, View, Text } from 'react-native';
-import { colors } from '../constants/colors';
 
 interface GlassInputProps extends TextInputProps {
   label?: string;
@@ -8,6 +8,8 @@ interface GlassInputProps extends TextInputProps {
 }
 
 export const GlassInput: React.FC<GlassInputProps> = ({ label, error, style, onFocus, onBlur, ...props }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -16,7 +18,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({ label, error, style, onF
       <View style={[styles.inputWrap, isFocused && styles.inputFocused, error && styles.inputError]}>
         <TextInput
           style={[styles.input, style]}
-          placeholderTextColor="rgba(255,255,255,0.3)"
+          placeholderTextColor={colors.text.placeholder}
           onFocus={(e) => { setIsFocused(true); onFocus?.(e); }}
           onBlur={(e) => { setIsFocused(false); onBlur?.(e); }}
           {...props}
@@ -27,13 +29,13 @@ export const GlassInput: React.FC<GlassInputProps> = ({ label, error, style, onF
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: { marginBottom: 14 },
   label: { color: colors.text.secondary, fontSize: 13, marginBottom: 8, fontWeight: '500' },
   inputWrap: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.glass.card,
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glass.cardBorder,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 48,

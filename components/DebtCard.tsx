@@ -1,10 +1,10 @@
+import { useTheme } from '../hooks/useTheme';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { GlassBadge } from './GlassBadge';
 import { Debt } from '../hooks/useDebts';
-import { colors } from '../constants/colors';
 import { formatCurrency, formatDate, getDaysRemaining, isExpired } from '../utils/dateHelpers';
 
 interface DebtCardProps {
@@ -15,6 +15,8 @@ interface DebtCardProps {
 }
 
 export const DebtCard: React.FC<DebtCardProps> = ({ debt, onTogglePaid, onPress, onDelete }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const overdue = debt.dueDate ? isExpired(debt.dueDate) && !debt.isPaid : false;
   const daysRemaining = debt.dueDate ? getDaysRemaining(debt.dueDate) : null;
 
@@ -91,11 +93,11 @@ export const DebtCard: React.FC<DebtCardProps> = ({ debt, onTogglePaid, onPress,
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   card: {
     marginHorizontal: 20, marginBottom: 12, padding: 16,
-    borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20, backgroundColor: colors.glass.card,
+    borderWidth: 0.5, borderColor: colors.glass.cardBorder,
   },
   cardPaid: { opacity: 0.65 },
   
@@ -119,13 +121,13 @@ const styles = StyleSheet.create({
   notes: { color: colors.text.muted, fontSize: 13, fontStyle: 'italic', lineHeight: 18 },
 
   // Divider
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginVertical: 14 },
+  divider: { height: 1, backgroundColor: colors.glass.card, marginVertical: 14 },
 
   // Bottom Row
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   datesCol: { gap: 6, flex: 1 },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dateText: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '500' },
+  dateText: { color: colors.text.secondary, fontSize: 13, fontWeight: '500' },
   
   // Action Button
   markBtn: { 

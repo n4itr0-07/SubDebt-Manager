@@ -48,12 +48,12 @@ export const pickAndImportData = async (mode: 'merge' | 'replace' = 'merge'): Pr
     }
 
     if (mode === 'replace') {
-      storage.set(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(data.subscriptions));
-      storage.set(STORAGE_KEYS.DEBTS, JSON.stringify(data.debts));
+      await storage.set(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(data.subscriptions));
+      await storage.set(STORAGE_KEYS.DEBTS, JSON.stringify(data.debts));
     } else {
       // Merge mode - skip duplicates by ID
-      const existingSubsRaw = storage.getString(STORAGE_KEYS.SUBSCRIPTIONS);
-      const existingDebtsRaw = storage.getString(STORAGE_KEYS.DEBTS);
+      const existingSubsRaw = await storage.getString(STORAGE_KEYS.SUBSCRIPTIONS);
+      const existingDebtsRaw = await storage.getString(STORAGE_KEYS.DEBTS);
       
       const existingSubs = existingSubsRaw ? JSON.parse(existingSubsRaw) : [];
       const existingDebts = existingDebtsRaw ? JSON.parse(existingDebtsRaw) : [];
@@ -67,8 +67,8 @@ export const pickAndImportData = async (mode: 'merge' | 'replace' = 'merge'): Pr
       const mergedSubs = [...existingSubs, ...newSubs];
       const mergedDebts = [...existingDebts, ...newDebts];
 
-      storage.set(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(mergedSubs));
-      storage.set(STORAGE_KEYS.DEBTS, JSON.stringify(mergedDebts));
+      await storage.set(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(mergedSubs));
+      await storage.set(STORAGE_KEYS.DEBTS, JSON.stringify(mergedDebts));
     }
 
     return {
@@ -86,9 +86,9 @@ export const pickAndImportData = async (mode: 'merge' | 'replace' = 'merge'): Pr
   }
 };
 
-export const clearAllData = (): boolean => {
+export const clearAllData = async (): Promise<boolean> => {
   try {
-    storage.clearAll();
+    await storage.clearAll();
     return true;
   } catch {
     return false;

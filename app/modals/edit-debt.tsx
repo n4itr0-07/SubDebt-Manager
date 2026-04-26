@@ -1,3 +1,4 @@
+import { useTheme } from '../../hooks/useTheme';
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -12,10 +13,14 @@ import { GlassInput } from '../../components/GlassInput';
 import { GlassButton } from '../../components/GlassButton';
 import { AppPopup } from '../../components/AppPopup';
 import { AmbientBackground } from '../../components/AmbientBackground';
+import { CurrencyPicker } from '../../components/CurrencyPicker';
 import { useDebts } from '../../hooks/useDebts';
-import { colors } from '../../constants/colors';
+import { formatShortDate } from '../../utils/dateHelpers';
+import { getCurrencyByCode } from '../../constants/currencies';
 
 export default function EditDebtModal() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { updateDebt, deleteDebt, getDebtById } = useDebts();
@@ -35,6 +40,7 @@ export default function EditDebtModal() {
   const [hasDueDate, setHasDueDate] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [popupVisible, setPopupVisible] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   useEffect(() => {
     if (debt) {
@@ -114,7 +120,9 @@ export default function EditDebtModal() {
           <View style={styles.row}>
             <View style={styles.amountCol}><GlassInput label="Amount" placeholder="0.00" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" error={errors.amount} /></View>
             <View style={styles.currBox}><Text style={styles.fieldLabel}>Currency</Text>
-              <View style={styles.currPill}><Text style={styles.currText}>{currency}</Text></View>
+              <TouchableOpacity style={styles.currPill} onPress={() => setShowCurrencyPicker(true)} activeOpacity={0.7}>
+                <Text style={styles.currText}>{getCurrencyByCode(currency).symbol} {currency}</Text>
+              </TouchableOpacity>
             </View>
           </View>
           <GlassInput label="Purpose (Optional)" placeholder="What is this for?" value={purpose} onChangeText={setPurpose} />
@@ -122,7 +130,7 @@ export default function EditDebtModal() {
           <TouchableOpacity style={styles.dateRow} onPress={() => setShowTakenPicker(true)}>
             <Ionicons name="calendar-outline" size={18} color={colors.accent.amber} />
             <Text style={styles.dateLabel}>Date Recorded</Text>
-            <Text style={styles.dateValue}>{takenDate.toLocaleDateString()}</Text>
+            <Text style={styles.dateValue}>{formatShortDate(takenDate)}</Text>
           </TouchableOpacity>
           <View style={styles.dueToggle}>
             <Text style={styles.dateLabel}>Set Due Date</Text>
@@ -134,7 +142,7 @@ export default function EditDebtModal() {
             <TouchableOpacity style={[styles.dateRow, errors.dueDate && {borderColor: colors.accent.red}]} onPress={() => setShowDuePicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={colors.accent.amber} />
               <Text style={styles.dateLabel}>Due Date</Text>
-              <Text style={styles.dateValue}>{dueDate?.toLocaleDateString() || 'Select'}</Text>
+              <Text style={styles.dateValue}>{dueDate ? formatShortDate(dueDate) : 'Select'}</Text>
             </TouchableOpacity>
           )}
           {errors.dueDate && <Text style={styles.err}>{errors.dueDate}</Text>}
@@ -160,33 +168,39 @@ export default function EditDebtModal() {
         onCancel={() => setPopupVisible(false)}
         onConfirm={confirmDelete}
       />
+      <CurrencyPicker
+        visible={showCurrencyPicker}
+        selectedCode={currency}
+        onSelect={setCurrency}
+        onClose={() => setShowCurrencyPicker(false)}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0c0c14' },
+const getStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background.primary },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   notFound: { color: colors.text.secondary, fontSize: 18, marginBottom: 16 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.glass.card, justifyContent: 'center', alignItems: 'center' },
   deleteBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(239,83,80,0.1)', justifyContent: 'center', alignItems: 'center' },
   title: { color: colors.text.primary, fontSize: 18, fontWeight: '700' },
   content: { padding: 16, paddingBottom: 40 },
   statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   fieldLabel: { color: colors.text.secondary, fontSize: 13, marginBottom: 8, fontWeight: '500' },
-  statusPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)' },
+  statusPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: colors.glass.card, borderWidth: 0.5, borderColor: colors.glass.cardBorder },
   statusActive: { backgroundColor: 'rgba(102,187,106,0.15)', borderColor: 'rgba(102,187,106,0.4)' },
   statusText: { color: colors.text.muted, fontSize: 13, fontWeight: '500' },
   statusTextActive: { color: '#66BB6A', fontWeight: '600' },
   row: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   amountCol: { flex: 1 },
-  currBox: { width: 90, marginBottom: 14 },
-  currPill: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 14, height: 48 },
+  currBox: { width: 110, marginBottom: 14 },
+  currPill: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glass.card, borderWidth: 0.5, borderColor: colors.glass.cardBorder, borderRadius: 14, height: 48 },
   currText: { color: colors.text.primary, fontSize: 15 },
   sectionLabel: { color: colors.text.secondary, fontSize: 13, marginBottom: 10, marginTop: 16, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
-  dueToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.glass.card, borderWidth: 0.5, borderColor: colors.glass.cardBorder, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
+  dueToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.glass.card, borderWidth: 0.5, borderColor: colors.glass.cardBorder, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
   dateLabel: { color: colors.text.secondary, fontSize: 14, flex: 1 },
   dateValue: { color: colors.text.primary, fontSize: 14, fontWeight: '600' },
   err: { color: colors.accent.red, fontSize: 12, marginTop: -4, marginBottom: 8 },

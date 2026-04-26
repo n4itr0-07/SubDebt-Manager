@@ -1,9 +1,9 @@
+import { useTheme } from '../hooks/useTheme';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../constants/colors';
 import { spacing } from '../constants/typography';
 
 interface SwipeableRowProps {
@@ -17,6 +17,8 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
   onEdit, 
   onDelete,
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const renderRightActions = (
     progress: Animated.AnimatedInterpolation<number>,
     dragX: Animated.AnimatedInterpolation<number>
@@ -38,7 +40,7 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
                 onEdit();
               }}
             >
-              <Ionicons name="create-outline" size={24} color="#fff" />
+              <Ionicons name="create-outline" size={24} color={colors.text.primary} />
               <Text style={styles.actionText}>Edit</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -52,7 +54,7 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
                 onDelete();
               }}
             >
-              <Ionicons name="trash-outline" size={24} color="#fff" />
+              <Ionicons name="trash-outline" size={24} color={colors.text.primary} />
               <Text style={styles.actionText}>Delete</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -72,7 +74,7 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     width: 140,
@@ -86,10 +88,14 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   editAction: {
-    backgroundColor: 'rgba(79,195,247,0.3)',
+    backgroundColor: colors.accent.blue + '33', // 20% opacity
+    borderWidth: 1,
+    borderColor: colors.accent.blue + '66', // 40% opacity
   },
   deleteAction: {
-    backgroundColor: 'rgba(239,83,80,0.3)',
+    backgroundColor: colors.accent.red + '33', // 20% opacity
+    borderWidth: 1,
+    borderColor: colors.accent.red + '66', // 40% opacity
   },
   actionButton: {
     flex: 1,
@@ -98,7 +104,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   actionText: {
-    color: '#fff',
+    color: colors.text.primary,
     fontSize: 12,
     marginTop: 4,
     fontWeight: '600',

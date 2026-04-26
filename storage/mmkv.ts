@@ -1,12 +1,20 @@
-import { createMMKV } from 'react-native-mmkv';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const storage = createMMKV({
-  id: 'subdebt-storage',
-  encryptionKey: 'subdebt-secure-key'
-});
+export const storage = {
+  getString: async (key: string): Promise<string | null> => {
+    return await AsyncStorage.getItem(key);
+  },
+  set: async (key: string, value: string): Promise<void> => {
+    await AsyncStorage.setItem(key, value);
+  },
+  delete: async (key: string): Promise<void> => {
+    await AsyncStorage.removeItem(key);
+  },
+  clearAll: async (): Promise<void> => {
+    await AsyncStorage.clear();
+  }
+};
 
 export const hydrateStorage = async (): Promise<void> => {
-  // react-native-mmkv is natively synchronous and extremely fast.
-  // No artificial hydration delay is needed in production!
   return Promise.resolve();
 };

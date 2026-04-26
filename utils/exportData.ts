@@ -12,8 +12,8 @@ interface ExportData {
 
 export const exportAllData = async (): Promise<boolean> => {
   try {
-    const subscriptionsRaw = storage.getString(STORAGE_KEYS.SUBSCRIPTIONS);
-    const debtsRaw = storage.getString(STORAGE_KEYS.DEBTS);
+    const subscriptionsRaw = await storage.getString(STORAGE_KEYS.SUBSCRIPTIONS);
+    const debtsRaw = await storage.getString(STORAGE_KEYS.DEBTS);
 
     const exportData: ExportData = {
       version: '1.0',

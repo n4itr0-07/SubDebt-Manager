@@ -6,6 +6,29 @@ import { hydrateStorage } from '../storage/mmkv';
 
 SplashScreen.preventAutoHideAsync();
 
+import { ThemeProvider, useTheme } from '../hooks/useTheme';
+
+function AppLayout() {
+  const { colors } = useTheme();
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background.primary },
+        animation: 'slide_from_right',
+      }}
+    >
+      <Stack.Screen name="onboarding" options={{ headerShown: false, animation: 'fade' }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="modals/add-subscription" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="modals/edit-subscription" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="modals/add-debt" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="modals/edit-debt" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="modals/settings" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   const [appIsReady, setAppIsReady] = useState(false);
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -58,7 +81,7 @@ export default function RootLayout() {
         {/* Loader */}
         <ActivityIndicator 
           size="small" 
-          color="rgba(79,195,247,0.5)" 
+          color="#4FC3F7" 
           style={styles.loader} 
         />
       </View>
@@ -66,27 +89,16 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: '#0c0c14' },
-        animation: 'slide_from_right',
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="modals/add-subscription" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="modals/edit-subscription" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="modals/add-debt" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="modals/edit-debt" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="modals/settings" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
-    </Stack>
+    <ThemeProvider>
+      <AppLayout />
+    </ThemeProvider>
   );
 }
 
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0c0c14',
+    backgroundColor: '#0a0a0f',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -106,7 +118,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   tagline: {
-    color: 'rgba(255,255,255,0.35)',
+    color: 'rgba(255,255,255,0.4)',
     fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',

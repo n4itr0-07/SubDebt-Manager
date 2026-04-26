@@ -2,9 +2,9 @@
   "expo": {
     "name": "SubDebt",
     "slug": "subdebt",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "scheme": "subdebt",
     "icon": "./assets/icon.png",
     "splash": {

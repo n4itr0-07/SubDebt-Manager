@@ -25,4 +25,5 @@ export {
   JioIcon, AirtelIcon, ViIcon,
   SwiggyIcon, ZomatoIcon, TimesPrimeIcon,
   AwsIcon, VercelIcon, CloudflareIcon, DigitalOceanIcon,
+  GeminiIcon, GoogleIcon, CopilotIcon, BsnlIcon,
 } from './BrandIcons';

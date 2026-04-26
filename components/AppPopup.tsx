@@ -1,8 +1,8 @@
+import { useTheme } from '../hooks/useTheme';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassButton } from './GlassButton';
-import { colors } from '../constants/colors';
 
 export interface AppPopupProps {
   visible: boolean;
@@ -22,13 +22,16 @@ export const AppPopup: React.FC<AppPopupProps> = ({
   title,
   message,
   icon = 'information-circle-outline',
-  iconColor = colors.accent.blue,
+  iconColor,
   confirmText = 'OK',
   cancelText,
   isDestructive = false,
   onConfirm,
   onCancel,
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+  const resolvedIconColor = iconColor || colors.accent.blue;
   const [show, setShow] = useState(visible);
   const scaleValue = useRef(new Animated.Value(0.9)).current;
   const opacityValue = useRef(new Animated.Value(0)).current;
@@ -56,7 +59,7 @@ export const AppPopup: React.FC<AppPopupProps> = ({
         <Animated.View style={[styles.overlayBg, { opacity: opacityValue }]} />
         <Animated.View style={[styles.dialog, { opacity: opacityValue, transform: [{ scale: scaleValue }] }]}>
           <View style={styles.iconCircle}>
-            <Ionicons name={icon as any} size={32} color={iconColor} />
+            <Ionicons name={icon as any} size={32} color={resolvedIconColor} />
           </View>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
@@ -80,7 +83,7 @@ export const AppPopup: React.FC<AppPopupProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'center',
@@ -94,34 +97,38 @@ const styles = StyleSheet.create({
   dialog: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: '#161625',
+    backgroundColor: colors.glass.card,
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glass.cardBorder,
     alignItems: 'center',
-    elevation: 10,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
   },
   iconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.glass.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glass.cardBorder,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
   title: {
-    color: '#fff',
+    color: colors.text.primary,
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },
   message: {
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.text.secondary,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',

@@ -4,7 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 export default function TestScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Test Screen - App is Working!</Text>
+      <Text style={{ color: 'white', marginTop: 10 }}>Press 'Done' below when finished drawing</Text>
     </View>
   );
 }
@@ -17,7 +17,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0a',
   },
   text: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 24,
     fontWeight: 'bold',
   },
