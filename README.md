@@ -17,30 +17,31 @@
 
 ---
 
+
 <table align="center">
   <tr>
     <td align="center">
-      <img src="placeholder_subscriptions.png" width="160" alt="Subscriptions Dashboard" />
+      <img src="https://github.com/user-attachments/assets/0afe4f63-ca29-4648-b738-e2aa95036dab" width="180" alt="Subscriptions Dashboard" />
       <br />
       <i>Subscriptions</i>
     </td>
     <td align="center">
-      <img src="placeholder_spending.png" width="160" alt="Daily Spending View" />
+<img src="https://github.com/user-attachments/assets/443bc080-bbc5-4047-a33d-747cd0ae5d23" width="180" alt="Daily Spending View" />
       <br />
       <i>Daily Spending</i>
     </td>
     <td align="center">
-      <img src="placeholder_debts.png" width="160" alt="Debts & Lent Tracker" />
+      <img src="https://github.com/user-attachments/assets/240bb47d-3371-462b-8c52-4109306222c2" width="180" alt="Debts & Lent Tracker" />
       <br />
-      <i>Debts & Lent</i>
+      <i>Debts</i>
     </td>
     <td align="center">
-      <img src="placeholder_quick_add.png" width="160" alt="Quick Add Menu" />
+      <img src="https://github.com/user-attachments/assets/ffac69d9-1191-4cbc-bd7e-69289c7fd571" width="180" alt="Quick Add Menu" />
       <br />
-      <i>Quick Add Menu</i>
+      <i>Lent</i>
     </td>
     <td align="center">
-      <img src="placeholder_settings.png" width="160" alt="Settings Menu" />
+      <img src="https://github.com/user-attachments/assets/e39bb87a-c30b-449b-8d61-017d2c84083b" width="180" alt="Settings Menu" />
       <br />
       <i>Settings</i>
     </td>
