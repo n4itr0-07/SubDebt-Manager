@@ -1,56 +1,90 @@
 <div align="center">
-  <img src="assets/icon.png" width="120" height="120" alt="SubDebt Logo" />
+  <img src="assets/icon.png" width="120" height="120" alt="SubDebt Manager Logo" style="border-radius: 50%;" />
   <h1>SubDebt Manager</h1>
-  <p><strong>The ultimate, privacy-first Subscription & Debt Tracking application.</strong></p>
+  <p><strong>A privacy-focused, offline-first application for tracking subscriptions, daily spending, and personal debts.</strong></p>
 
   [![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactnative.dev/)
   [![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-  [![Build Status](https://img.shields.io/github/actions/workflow/status/n4itr0-07/SubDebt-Manager/build.yml?branch=main&style=for-the-badge)](https://github.com/n4itr0-07/SubDebt-Manager/actions)
+  
+  <br />
+  <a href="https://github.com/SubDebt-Manager/SubDebt-Manager/releases/latest">
+    <img src="https://img.shields.io/badge/Download_Latest_APK-FF2D20?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
+  </a>
 
 </div>
 
 ---
 
-## 🚀 Overview
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="placeholder_subscriptions.png" width="160" alt="Subscriptions Dashboard" />
+      <br />
+      <i>Subscriptions</i>
+    </td>
+    <td align="center">
+      <img src="placeholder_spending.png" width="160" alt="Daily Spending View" />
+      <br />
+      <i>Daily Spending</i>
+    </td>
+    <td align="center">
+      <img src="placeholder_debts.png" width="160" alt="Debts & Lent Tracker" />
+      <br />
+      <i>Debts & Lent</i>
+    </td>
+    <td align="center">
+      <img src="placeholder_quick_add.png" width="160" alt="Quick Add Menu" />
+      <br />
+      <i>Quick Add Menu</i>
+    </td>
+    <td align="center">
+      <img src="placeholder_settings.png" width="160" alt="Settings Menu" />
+      <br />
+      <i>Settings</i>
+    </td>
+  </tr>
+</table>
 
-**SubDebt** is a beautifully crafted, highly performant financial management application engineered to help you meticulously track recurring subscriptions and outstanding debts. Built with an uncompromising focus on **privacy** and **speed**, SubDebt operates 100% offline using a blazing-fast C++ database architecture.
+## Overview
 
-## ✨ Core Features
+SubDebt Manager is a fast, responsive mobile application designed to help you organize your daily finances. It brings together subscription tracking, personal debt management, and daily spending logs into one clean interface. Built entirely offline, the application ensures that your financial data stays securely on your device.
 
-### 🔄 Advanced Subscription Tracking
-- **Smart Auto-Branding:** Automatically detects popular services (Netflix, Spotify, Amazon, etc.) and seamlessly integrates their official brand icons into your dashboard.
-- **Dynamic Timelines:** Visual progress bars track the exact time remaining until your next billing cycle.
-- **Automated Tagging:** Subscriptions dynamically tag themselves as `Active`, `Expiring Soon`, or `Expired` based on real-time chronological calculations.
+## Core Features
 
-### 💸 Intelligent Debt Management
-- **One-Tap Resolution:** Satisfying haptic-enabled "Mark Paid" functionality instantly resolves outstanding balances.
-- **Overdue Analytics:** Delinquent debts are automatically flagged in crimson, calculating the exact number of days overdue.
-- **Live Aggregation:** A real-time running ledger calculates the total pending capital owed to you at any given moment.
+### Subscription Tracking
+- **Automatic Branding:** Detects popular services and automatically assigns the correct brand icons.
+- **Billing Cycles:** Tracks time remaining until the next billing cycle and categorizes subscriptions by their status (active, expiring soon, expired).
 
-### ⚡ Unrivaled Performance & Privacy
-- **Zero Latency:** Powered by `react-native-mmkv`, data is stored in C++ memory-mapped files, achieving synchronous 0.001ms read/write speeds.
-- **Offline First:** No telemetry, no cloud servers, no hidden tracking. Your financial data is securely sandboxed on your local device.
-- **Universal Portability:** A robust JSON-based backup and restore engine allows you to safely export your encrypted ledger to Google Drive, or seamlessly migrate to a new device.
+### Debt & Lent Management
+- **Running Ledger:** Calculates your total pending capital across all people who owe you money, or people you owe.
+- **Overdue Analytics:** Highlights overdue debts and calculates exactly how many days they are past due.
+- **Resolution:** Quickly mark debts as paid with immediate feedback.
 
-## 📱 User Interface Architecture
-SubDebt utilizes a completely bespoke **Glassmorphism Design System**. Every card, input field, and modal features custom semi-transparent blurring, sophisticated ambient lighting, strict dark-mode compliance, and spring-physics-based fluid animations.
+### Daily Spending
+- **Streak Building:** Encourages daily logging by tracking your active entry streak.
+- **Visual Charts:** Automatically generates a 7-day spending chart and categorizes your expenses.
+- **Quick Entry:** Features a central quick-add menu to rapidly record purchases on the go.
 
----
+### Privacy & Architecture
+- **Offline First:** No telemetry, cloud servers, or remote databases. Data is sandboxed locally on your device.
+- **Fast Storage:** Powered by memory-mapped files (MMKV) for instantaneous read and write speeds.
+- **Data Portability:** Includes a complete JSON backup and restore system, allowing you to export your data and move it to a new device.
+- **Dynamic Theming:** Features a custom UI system that fully supports both light and dark modes, adapting instantly to your system preferences.
 
-## 🛠️ Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or newer)
-- [Expo CLI](https://docs.expo.dev/get-started/installation/)
-- iOS Simulator or Android Studio (for native C++ module compilation)
+- Node.js (v18 or newer)
+- Expo CLI
+- iOS Simulator or Android Studio
 
 ### Quick Start
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/n4itr0-07/SubDebt-Manager.git
+   git clone https://github.com/SubDebt-Manager/SubDebt-Manager.git
    cd SubDebt-Manager
    ```
 
@@ -60,7 +94,7 @@ SubDebt utilizes a completely bespoke **Glassmorphism Design System**. Every car
    ```
 
 3. **Compile and Run:**
-   *Because SubDebt uses high-performance native C++ modules (`react-native-mmkv`), it cannot run in the standard Expo Go app. You must build a development client.*
+   Because SubDebt uses native C++ modules for local storage, it requires a development build rather than the standard Expo Go client.
    ```bash
    # For Android
    npx expo run:android
@@ -69,21 +103,13 @@ SubDebt utilizes a completely bespoke **Glassmorphism Design System**. Every car
    npx expo run:ios
    ```
 
----
+## Automated Release Pipeline
 
-## 📦 Automated Release Pipeline
+This project includes an automated CI/CD pipeline via GitHub Actions. Whenever a new version tag (e.g., `v1.2.0`) is pushed, the system automatically builds an optimized `arm64-v8a` APK and attaches it to a new GitHub Release. 
 
-This repository features a fully automated CI/CD pipeline integrated directly via **GitHub Actions**.
-
-Whenever a new release tag (e.g., `v1.0.0`) is pushed to the repository, the GitHub Action will automatically:
-1. Initialize the Android SDK and Java environment.
-2. Execute an optimized native prebuild.
-3. Compile an exclusive, highly-compressed `arm64-v8a` split APK.
-4. Draft a pristine GitHub Release and attach the compiled APK for immediate public download.
-
-To download the latest compiled version of the app, simply navigate to the **[Releases](https://github.com/n4itr0-07/SubDebt-Manager/releases)** tab of this repository.
+You can find the latest compiled application in the **Releases** tab.
 
 ---
 <div align="center">
-  <i>Engineered for elegance. Built for performance.</i>
+  <i>Engineered for reliability. Built for privacy.</i>
 </div>

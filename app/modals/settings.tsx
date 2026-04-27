@@ -16,17 +16,21 @@ import { exportAllData } from '../../utils/exportData';
 import { pickAndImportData, clearAllData } from '../../utils/importData';
 import { useDebts } from '../../hooks/useDebts';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
+import { useCredits } from '../../hooks/useCredits';
+import { useDailySpending } from '../../hooks/useDailySpending';
 import { useCurrency } from '../../hooks/useCurrency';
 import { storage } from '../../storage/mmkv';
 import { STORAGE_KEYS } from '../../storage/keys';
 import Constants from 'expo-constants';
 
 export default function SettingsModal() {
-  const { colors, mode, setMode } = useTheme();
-  const styles = getStyles(colors);
+  const { colors, mode, setMode, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { refresh: refreshDebts } = useDebts();
   const { refresh: refreshSubs } = useSubscriptions();
+  const { refresh: refreshCredits } = useCredits();
+  const { refresh: refreshSpending } = useDailySpending();
   const { currency, setCurrency: setSelectedCurrency } = useCurrency();
   
   const [exporting, setExporting] = useState(false);
@@ -66,10 +70,10 @@ export default function SettingsModal() {
     setImporting(false);
     
     if (result.success) { 
-      refreshDebts(); refreshSubs(); 
+      refreshDebts(); refreshSubs(); refreshCredits(); refreshSpending();
       showPopup({
         title: 'Import Successful',
-        message: `Merged ${result.subscriptionsCount} subscriptions and ${result.debtsCount} debts.`,
+        message: `Merged ${result.subscriptionsCount} subs, ${result.creditsCount} lent, ${result.debtsCount} debts, ${result.spendingCount} spending entries.`,
         icon: 'checkmark-circle-outline',
         iconColor: '#66BB6A',
         confirmText: 'Done',
@@ -103,10 +107,10 @@ export default function SettingsModal() {
         const result = await pickAndImportData('replace');
         setImporting(false);
         if (result.success) { 
-          refreshDebts(); refreshSubs(); 
+          refreshDebts(); refreshSubs(); refreshCredits(); refreshSpending();
           setTimeout(() => showPopup({
             title: 'Import Successful',
-            message: `Replaced with ${result.subscriptionsCount} subs and ${result.debtsCount} debts.`,
+            message: `Replaced with ${result.subscriptionsCount} subs, ${result.creditsCount} lent, ${result.debtsCount} debts, ${result.spendingCount} spending entries.`,
             icon: 'checkmark-circle-outline',
             iconColor: '#66BB6A',
             confirmText: 'Done',
@@ -141,7 +145,7 @@ export default function SettingsModal() {
   const handleClearAll = () => {
     showPopup({
       title: 'Clear All Data?',
-      message: 'This will permanently delete ALL subscriptions and debts. This action cannot be undone.',
+      message: 'This will permanently delete ALL subscriptions, debts, credits, and spending. This action cannot be undone.',
       icon: 'alert-circle-outline',
       iconColor: colors.accent.red,
       cancelText: 'Cancel',
@@ -160,7 +164,7 @@ export default function SettingsModal() {
           isDestructive: true,
           onCancel: closePopup,
           onConfirm: async () => {
-            await clearAllData(); refreshDebts(); refreshSubs();
+            await clearAllData(); refreshDebts(); refreshSubs(); refreshCredits(); refreshSpending();
             closePopup();
             setTimeout(() => showPopup({
               title: 'Data Cleared',
@@ -282,7 +286,7 @@ export default function SettingsModal() {
             <Ionicons name="trash-outline" size={22} color={colors.accent.red} />
             <Text style={styles.dangerLabel}>Clear All Data</Text>
           </TouchableOpacity>
-          <Text style={styles.cardDesc}>Permanently delete all your subscriptions and debts.</Text>
+          <Text style={styles.cardDesc}>Permanently delete all your tracking data.</Text>
         </View>
 
         <Text style={styles.sectionTitle}>ABOUT</Text>
@@ -318,14 +322,14 @@ export default function SettingsModal() {
   );
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background.primary },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.glass.card, justifyContent: 'center', alignItems: 'center' },
   title: { color: colors.text.primary, fontSize: 18, fontWeight: '700' },
   content: { padding: 16, paddingBottom: 40 },
   sectionTitle: { color: colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 1, marginTop: 24, marginBottom: 12 },
-  card: { backgroundColor: colors.glass.buttonSecondary, borderWidth: 1, borderColor: colors.glass.navBorder, borderRadius: 16, padding: 16, marginBottom: 16 },
+  card: { backgroundColor: isDark ? 'rgba(30, 30, 45, 0.6)' : colors.glass.buttonSecondary, borderWidth: 1, borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.glass.navBorder, borderRadius: 16, padding: 16, marginBottom: 16 },
   cardDesc: { color: colors.text.secondary, fontSize: 14, marginBottom: 16, lineHeight: 20 },
 
   // Currency Selector
@@ -333,7 +337,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.glass.card,
+    backgroundColor: isDark ? 'rgba(30, 30, 45, 0.8)' : colors.glass.card,
     borderWidth: 0.5,
     borderColor: colors.glass.cardBorder,
     borderRadius: 14,
@@ -369,7 +373,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
 
   importRow: { flexDirection: 'row', gap: 12 },
-  importBtn: { flex: 1, backgroundColor: colors.glass.card, borderWidth: 1, borderColor: colors.glass.cardBorder, borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center' },
+  importBtn: { flex: 1, backgroundColor: isDark ? 'rgba(30, 30, 45, 0.8)' : colors.glass.card, borderWidth: 1, borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.glass.cardBorder, borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center' },
   importBtnDanger: { borderColor: 'rgba(239,83,80,0.2)' },
   iconBox: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   importTextWrap: { alignItems: 'center' },

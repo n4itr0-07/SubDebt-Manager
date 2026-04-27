@@ -17,8 +17,8 @@ interface CurrencyPickerProps {
 export const CurrencyPicker: React.FC<CurrencyPickerProps> = ({
   visible, selectedCode, onSelect, onClose,
 }) => {
-  const { colors } = useTheme();
-  const styles = getStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
@@ -119,14 +119,14 @@ export const CurrencyPicker: React.FC<CurrencyPickerProps> = ({
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(15,23,42,0.25)',
     justifyContent: 'flex-end',
   },
   container: {
-    backgroundColor: '#12121e',
+    backgroundColor: colors.background.primary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
@@ -159,9 +159,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.glass.card,
+    backgroundColor: colors.glass.input,
     borderWidth: 0.5,
-    borderColor: colors.glass.cardBorder,
+    borderColor: colors.glass.inputBorder,
     borderRadius: 14,
     marginHorizontal: 20,
     marginBottom: 12,
@@ -188,9 +188,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginBottom: 2,
   },
   itemSelected: {
-    backgroundColor: 'rgba(79,195,247,0.08)',
+    backgroundColor: isDark ? 'rgba(79,195,247,0.08)' : 'rgba(2,132,199,0.12)',
     borderWidth: 0.5,
-    borderColor: 'rgba(79,195,247,0.2)',
+    borderColor: isDark ? 'rgba(79,195,247,0.2)' : 'rgba(2,132,199,0.28)',
   },
   flag: {
     fontSize: 24,

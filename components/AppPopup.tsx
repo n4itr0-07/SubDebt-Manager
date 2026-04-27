@@ -29,8 +29,8 @@ export const AppPopup: React.FC<AppPopupProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const { colors } = useTheme();
-  const styles = getStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const resolvedIconColor = iconColor || colors.accent.blue;
   const [show, setShow] = useState(visible);
   const scaleValue = useRef(new Animated.Value(0.9)).current;
@@ -83,7 +83,7 @@ export const AppPopup: React.FC<AppPopupProps> = ({
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'center',
@@ -97,7 +97,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   dialog: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: colors.glass.card,
+    backgroundColor: isDark ? 'rgba(30, 30, 45, 0.98)' : 'rgba(255, 255, 255, 0.98)',
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
@@ -106,14 +106,14 @@ const getStyles = (colors: any) => StyleSheet.create({
     elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
+    shadowOpacity: isDark ? 0.6 : 0.15,
     shadowRadius: 24,
   },
   iconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.glass.card,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.glass.card,
     borderWidth: 1,
     borderColor: colors.glass.cardBorder,
     justifyContent: 'center',

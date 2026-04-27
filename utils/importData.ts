@@ -8,14 +8,28 @@ interface ImportData {
   exportedAt: string;
   subscriptions: any[];
   debts: any[];
+  credits?: any[];
+  dailySpending?: any[];
 }
 
 interface ImportResult {
   success: boolean;
   subscriptionsCount: number;
   debtsCount: number;
+  creditsCount: number;
+  spendingCount: number;
   error?: string;
 }
+
+const mergeByIds = async (storageKey: string, incoming: any[]): Promise<number> => {
+  const existingRaw = await storage.getString(storageKey);
+  const existing = existingRaw ? JSON.parse(existingRaw) : [];
+  const existingIds = new Set(existing.map((item: any) => item.id));
+  const newItems = incoming.filter((item: any) => !existingIds.has(item.id));
+  const merged = [...existing, ...newItems];
+  await storage.set(storageKey, JSON.stringify(merged));
+  return newItems.length;
+};
 
 export const pickAndImportData = async (mode: 'merge' | 'replace' = 'merge'): Promise<ImportResult> => {
   try {
@@ -29,6 +43,8 @@ export const pickAndImportData = async (mode: 'merge' | 'replace' = 'merge'): Pr
         success: false,
         subscriptionsCount: 0,
         debtsCount: 0,
+        creditsCount: 0,
+        spendingCount: 0,
         error: 'User cancelled',
       };
     }
@@ -43,44 +59,42 @@ export const pickAndImportData = async (mode: 'merge' | 'replace' = 'merge'): Pr
         success: false,
         subscriptionsCount: 0,
         debtsCount: 0,
+        creditsCount: 0,
+        spendingCount: 0,
         error: 'Invalid backup file format',
       };
     }
 
+    const credits = Array.isArray(data.credits) ? data.credits : [];
+    const dailySpending = Array.isArray(data.dailySpending) ? data.dailySpending : [];
+
     if (mode === 'replace') {
       await storage.set(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(data.subscriptions));
       await storage.set(STORAGE_KEYS.DEBTS, JSON.stringify(data.debts));
+      await storage.set(STORAGE_KEYS.CREDITS, JSON.stringify(credits));
+      await storage.set(STORAGE_KEYS.DAILY_SPENDING, JSON.stringify(dailySpending));
     } else {
       // Merge mode - skip duplicates by ID
-      const existingSubsRaw = await storage.getString(STORAGE_KEYS.SUBSCRIPTIONS);
-      const existingDebtsRaw = await storage.getString(STORAGE_KEYS.DEBTS);
-      
-      const existingSubs = existingSubsRaw ? JSON.parse(existingSubsRaw) : [];
-      const existingDebts = existingDebtsRaw ? JSON.parse(existingDebtsRaw) : [];
-
-      const existingSubIds = new Set(existingSubs.map((s: any) => s.id));
-      const existingDebtIds = new Set(existingDebts.map((d: any) => d.id));
-
-      const newSubs = data.subscriptions.filter((s: any) => !existingSubIds.has(s.id));
-      const newDebts = data.debts.filter((d: any) => !existingDebtIds.has(d.id));
-
-      const mergedSubs = [...existingSubs, ...newSubs];
-      const mergedDebts = [...existingDebts, ...newDebts];
-
-      await storage.set(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(mergedSubs));
-      await storage.set(STORAGE_KEYS.DEBTS, JSON.stringify(mergedDebts));
+      await mergeByIds(STORAGE_KEYS.SUBSCRIPTIONS, data.subscriptions);
+      await mergeByIds(STORAGE_KEYS.DEBTS, data.debts);
+      await mergeByIds(STORAGE_KEYS.CREDITS, credits);
+      await mergeByIds(STORAGE_KEYS.DAILY_SPENDING, dailySpending);
     }
 
     return {
       success: true,
       subscriptionsCount: data.subscriptions.length,
       debtsCount: data.debts.length,
+      creditsCount: credits.length,
+      spendingCount: dailySpending.length,
     };
   } catch (error) {
     return {
       success: false,
       subscriptionsCount: 0,
       debtsCount: 0,
+      creditsCount: 0,
+      spendingCount: 0,
       error: error instanceof Error ? error.message : 'Import failed',
     };
   }
@@ -88,7 +102,10 @@ export const pickAndImportData = async (mode: 'merge' | 'replace' = 'merge'): Pr
 
 export const clearAllData = async (): Promise<boolean> => {
   try {
-    await storage.clearAll();
+    await storage.delete(STORAGE_KEYS.SUBSCRIPTIONS);
+    await storage.delete(STORAGE_KEYS.DEBTS);
+    await storage.delete(STORAGE_KEYS.CREDITS);
+    await storage.delete(STORAGE_KEYS.DAILY_SPENDING);
     return true;
   } catch {
     return false;

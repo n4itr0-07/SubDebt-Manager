@@ -6,12 +6,15 @@ import { hydrateStorage } from '../storage/mmkv';
 
 SplashScreen.preventAutoHideAsync();
 
+import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from '../hooks/useTheme';
 
 function AppLayout() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   return (
-    <Stack
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background.primary },
@@ -25,7 +28,12 @@ function AppLayout() {
       <Stack.Screen name="modals/add-debt" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="modals/edit-debt" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="modals/settings" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="modals/add-spending" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="modals/edit-spending" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="modals/add-credit" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="modals/edit-credit" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
     </Stack>
+    </>
   );
 }
 

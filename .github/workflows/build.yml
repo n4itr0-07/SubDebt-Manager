@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK (arm64-v8a)
+    name: Build Android APKs (Split Architecture)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -48,27 +48,24 @@ jobs:
       - name: Prebuild Expo Android
         run: npx expo prebuild --platform android --clean
 
-      - name: Optimize Build for arm64-only
+      - name: Optimize Build & Enable ABI Splits
         run: |
           GRADLE_FILE="android/app/build.gradle"
 
           # Enable Proguard/R8 Shrinking (CRITICAL for size reduction)
           sed -i 's/def enableProguardInReleaseBuilds = false/def enableProguardInReleaseBuilds = true/g' "$GRADLE_FILE"
 
-          # Append a guaranteed arm64-only filter block at the end of build.gradle
-          # This overrides any existing ABI config and forces ONLY arm64-v8a
+          # Append ABI split config to generate separate APKs
           cat >> "$GRADLE_FILE" << 'GRADLE_PATCH'
 
-          // === CI: Force arm64-v8a only ===
+          // === CI: Enable ABI Splits ===
           android {
-              defaultConfig {
-                  ndk {
-                      abiFilters "arm64-v8a"
-                  }
-              }
               splits {
                   abi {
-                      enable false
+                      enable true
+                      reset()
+                      include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+                      universalApk true
                   }
               }
           }
@@ -83,33 +80,34 @@ jobs:
           ./gradlew assembleRelease --no-daemon \
             -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
 
-      - name: Rename APK
+      - name: Collect and Rename APKs
         run: |
           echo "--- APK output listing ---"
-          ls -lh android/app/build/outputs/apk/release/
+          find android/app/build/outputs/apk/release/ -name "*.apk"
 
-          # Pick whichever APK exists (split name or default name)
-          APK=$(find android/app/build/outputs/apk/release/ -name "*.apk" ! -name "*unsigned*" | head -1)
+          mkdir -p release-apks
+          
+          for apk in android/app/build/outputs/apk/release/*.apk; do
+            if [[ "$apk" != *"unsigned"* ]]; then
+              filename=$(basename "$apk")
+              new_name=$(echo "$filename" | sed -e 's/app-/SubDebt-/g' -e 's/-release//g')
+              mv "$apk" "release-apks/$new_name"
+              echo "Prepared: release-apks/$new_name"
+            fi
+          done
 
-          if [ -z "$APK" ]; then
-            echo "::error::No release APK found!"
-            exit 1
-          fi
-
-          mv "$APK" SubDebt-arm64.apk
-          echo "Renamed $APK → SubDebt-arm64.apk"
-
-      - name: Verify APK Size
+      - name: Verify APK Sizes
         run: |
-          SIZE_BYTES=$(stat -c%s SubDebt-arm64.apk)
-          SIZE_MB=$((SIZE_BYTES / 1048576))
-          echo "APK size: ${SIZE_MB} MB (${SIZE_BYTES} bytes)"
-
-          if [ "$SIZE_MB" -gt 100 ]; then
-            echo "::error::APK is ${SIZE_MB}MB — exceeds 100MB limit. Check architecture filtering."
-            exit 1
-          fi
-          echo "✅ APK size is within range."
+          for apk in release-apks/*.apk; do
+            SIZE_BYTES=$(stat -c%s "$apk")
+            SIZE_MB=$((SIZE_BYTES / 1048576))
+            echo "$apk size: ${SIZE_MB} MB (${SIZE_BYTES} bytes)"
+            
+            if [ "$SIZE_MB" -gt 150 ]; then
+              echo "::warning::APK $apk is ${SIZE_MB}MB — exceeds 150MB warning threshold."
+            fi
+          done
+          echo "✅ APK verification complete."
 
       - name: Generate Release Notes
         id: notes
@@ -117,25 +115,24 @@ jobs:
           echo "## 🚀 SubDebt Production Release" > release_notes.md
           echo "" >> release_notes.md
           echo "### 🔥 What's New" >> release_notes.md
-          echo "- **Dynamic Light/Dark Theme**: Complete architectural shift to a themeable UI. Includes a persistent toggle in settings and full system-theme synchronization." >> release_notes.md
-          echo "- **Onboarding Experience**: New professional 3-slide walkthrough for first-time users with smooth spring animations and haptic feedback." >> release_notes.md
-          echo "- **Massive Icon Expansion**: Added 40+ high-fidelity brand icons including Indian Telecom (Jio, Airtel, Vi), AI (Gemini, Claude), and Local Services (Swiggy, Zomato)." >> release_notes.md
-          echo "- **Refined Glassmorphism UX**: Improved card visibility in light mode with higher opacity, custom shadows, and a theme-aware floating navigation bar." >> release_notes.md
-          echo "- **Data Portability**: Full JSON backup/restore system and a new 'Reset Onboarding' utility for developers." >> release_notes.md
+          echo "- **Daily Spending Tracker**: Monitor your daily expenses, visualize your habits with a 7-day chart, and build a streak." >> release_notes.md
+          echo "- **Quick Add Menu**: A new premium central '+' button that opens a beautiful, haptic-rich staggered animated grid for quick entries." >> release_notes.md
+          echo "- **Unified Data Management**: Overhauled settings to safely clear tracking data without losing user preferences, and flawless import/export for all data." >> release_notes.md
+          echo "- **UI/UX Polish**: Perfected dark mode styling, fixed Android shadow glitches, dynamic status bar, and expanded 4-slide onboarding." >> release_notes.md
           echo "" >> release_notes.md
-          echo "> 📱 **Note**: This is an optimized \`arm64-v8a\` APK build with R8 code shrinking and ProGuard enabled for maximum performance." >> release_notes.md
+          echo "> 📱 **Note**: This release includes separate optimized APKs for different device architectures (\`arm64-v8a\`, \`armeabi-v7a\`, \`x86_64\`) and a universal fallback." >> release_notes.md
 
-      - name: Upload Artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SubDebt-APK
-          path: SubDebt-arm64.apk
+          name: SubDebt-APKs
+          path: release-apks/*.apk
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v1
         with:
-          files: SubDebt-arm64.apk
+          files: release-apks/*.apk
           body_path: release_notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
