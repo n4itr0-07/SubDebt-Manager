@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 import { storage } from '../storage/mmkv';
 import { STORAGE_KEYS } from '../storage/keys';
 
@@ -28,9 +29,30 @@ export const exportAllData = async (): Promise<boolean> => {
       dailySpending: dailySpendingRaw ? JSON.parse(dailySpendingRaw) : [],
     };
 
-    const fileName = `subdebt-backup-${new Date().toISOString().split('T')[0]}.json`;
-    const filePath = `${FileSystem.cacheDirectory}${fileName}`;
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '');
+    const fileName = `SubDebt_Backup_${dateStr}_${timeStr}.json`;
 
+    if (Platform.OS === 'android') {
+      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (permissions.granted) {
+        const uri = await FileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          fileName,
+          'application/json'
+        );
+        await FileSystem.writeAsStringAsync(
+          uri,
+          JSON.stringify(exportData, null, 2)
+        );
+        return true;
+      }
+      return false; // User cancelled
+    }
+
+    // iOS fallback
+    const filePath = `${FileSystem.documentDirectory}${fileName}`;
     await FileSystem.writeAsStringAsync(
       filePath,
       JSON.stringify(exportData, null, 2)
@@ -41,12 +63,14 @@ export const exportAllData = async (): Promise<boolean> => {
       await Sharing.shareAsync(filePath, {
         mimeType: 'application/json',
         dialogTitle: 'Export SubDebt Backup',
+        UTI: 'public.json',
       });
       return true;
     }
 
     return false;
-  } catch {
+  } catch (error) {
+    console.error('Export failed:', error);
     return false;
   }
 };

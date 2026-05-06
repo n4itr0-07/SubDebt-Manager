@@ -37,7 +37,7 @@ export const QuickAddMenu: React.FC<QuickAddMenuProps> = ({ visible, onClose }) 
 
   useEffect(() => {
     if (visible) {
-      progress.value = withSpring(1, { damping: 20, stiffness: 200 });
+      progress.value = withSpring(1, { damping: 25, stiffness: 120, overshootClamping: true });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else {
       progress.value = withTiming(0, { duration: 250 });

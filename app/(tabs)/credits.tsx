@@ -28,7 +28,7 @@ export default function CreditsScreen() {
   const styles = getStyles(colors);
   const router = useRouter();
   const { credits, isLoaded, deleteCredit, markCreditAsReturned, getTotalPendingAmount, refresh } = useCredits();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, convertAmount, refresh: refreshCurrency } = useCurrency();
   const [filter, setFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export default function CreditsScreen() {
     return result;
   }, [credits, filter, searchQuery]);
 
-  const totalPending = getTotalPendingAmount();
+  const totalPending = getTotalPendingAmount(convertAmount);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -65,7 +65,8 @@ export default function CreditsScreen() {
   useFocusEffect(
     useCallback(() => {
       refresh();
-    }, [refresh])
+      refreshCurrency();
+    }, [refresh, refreshCurrency])
   );
 
   const handleAddPress = () => {

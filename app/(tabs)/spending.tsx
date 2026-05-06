@@ -7,13 +7,14 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpendingEntryCard } from '../../components/SpendingEntryCard';
-import { WeeklySpendingChart } from '../../components/WeeklySpendingChart';
+import { SpendingTrendChart } from '../../components/SpendingTrendChart';
 import { CategoryBreakdown } from '../../components/CategoryBreakdown';
 import { EmptyState } from '../../components/EmptyState';
 import { SwipeableRow } from '../../components/SwipeableRow';
@@ -21,11 +22,24 @@ import { AmbientBackground } from '../../components/AmbientBackground';
 import { AppPopup } from '../../components/AppPopup';
 import { SearchBar } from '../../components/SearchBar';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
-import { useDailySpending, SpendingEntry } from '../../hooks/useDailySpending';
+import {
+  useDailySpending,
+  SpendingEntry,
+  TimeRange,
+} from '../../hooks/useDailySpending';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useBudget } from '../../hooks/useBudget';
 import { formatCurrency } from '../../utils/dateHelpers';
 
 type ViewMode = 'overview' | 'entries';
+
+const TIME_RANGE_OPTIONS: { key: TimeRange; label: string; shortLabel: string }[] = [
+  { key: '7d', label: 'Last 7 Days', shortLabel: '7D' },
+  { key: '30d', label: 'Last 30 Days', shortLabel: '30D' },
+  { key: '90d', label: 'Last 3 Months', shortLabel: '3M' },
+  { key: '1y', label: 'This Year', shortLabel: '1Y' },
+  { key: 'all', label: 'All Time', shortLabel: 'All' },
+];
 
 export default function SpendingScreen() {
   const { colors, isDark } = useTheme();
@@ -38,34 +52,71 @@ export default function SpendingScreen() {
     getTotalForDay,
     getTotalForWeek,
     getTotalForMonth,
+    getTotalForYear,
+    getTotalForRange,
     getDailyAverage,
     getWeeklyData,
+    getDailyData,
+    getYearlyMonthlyData,
     getCategoryTotals,
+    getComparisonStats,
+    getHighestSpendingDay,
+    getEntriesForRange,
     refresh,
   } = useDailySpending();
-  const { currencyCode } = useCurrency();
+  const { budget } = useBudget();
+  const { currencyCode, convertAmount, refresh: refreshCurrency } = useCurrency();
   const [refreshing, setRefreshing] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
+  const [timeRange, setTimeRange] = useState<TimeRange>('7d');
 
-  const todayTotal = getTotalForDay(new Date());
-  const weekTotal = getTotalForWeek();
-  const monthTotal = getTotalForMonth(new Date());
-  const dailyAvg = getDailyAverage();
-  const weeklyData = getWeeklyData();
-  const categoryTotals = getCategoryTotals();
+  const todayTotal = getTotalForDay(new Date(), convertAmount);
+  const weekTotal = getTotalForWeek(convertAmount);
+  const monthTotal = getTotalForMonth(new Date(), convertAmount);
+  const yearTotal = getTotalForYear(new Date(), convertAmount);
+  const rangeTotal = getTotalForRange(timeRange);
+
+  // Budget calculations
+  const budgetProgress = budget.amount > 0 ? monthTotal / budget.amount : 0;
+  const remainingBudget = budget.amount - monthTotal;
+  const dailyAvg = getDailyAverage(timeRange, convertAmount);
+  const weeklyData = getWeeklyData(convertAmount);
+  const dailyData30 = useMemo(() => getDailyData(30, convertAmount), [getDailyData, convertAmount]);
+  const dailyData90 = useMemo(() => getDailyData(90, convertAmount), [getDailyData, convertAmount]);
+  const yearlyData = useMemo(() => getYearlyMonthlyData(convertAmount), [getYearlyMonthlyData, convertAmount]);
+  const categoryTotals = useMemo(() => getCategoryTotals(timeRange, convertAmount), [getCategoryTotals, timeRange, convertAmount]);
+  const comparisonStats = useMemo(
+    () => getComparisonStats(timeRange, convertAmount),
+    [getComparisonStats, timeRange, convertAmount]
+  );
+  const highestDay = useMemo(
+    () => getHighestSpendingDay(timeRange, convertAmount),
+    [getHighestSpendingDay, timeRange, convertAmount]
+  );
+
+  const rangeEntries = useMemo(
+    () => getEntriesForRange(timeRange),
+    [getEntriesForRange, timeRange]
+  );
 
   const filteredEntries = useMemo(() => {
-    if (!searchQuery.trim()) return entries;
+    const source = viewMode === 'entries' ? rangeEntries : rangeEntries;
+    if (!searchQuery.trim()) return source;
     const q = searchQuery.toLowerCase().trim();
-    return entries.filter(
+    return source.filter(
       (entry) =>
         entry.title.toLowerCase().includes(q) ||
         entry.category.toLowerCase().includes(q) ||
         (entry.notes && entry.notes.toLowerCase().includes(q))
     );
-  }, [entries, searchQuery]);
+  }, [rangeEntries, searchQuery, viewMode]);
+
+  const rangeLabel = useMemo(() => {
+    const opt = TIME_RANGE_OPTIONS.find((o) => o.key === timeRange);
+    return opt?.label || 'Last 7 Days';
+  }, [timeRange]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -76,7 +127,8 @@ export default function SpendingScreen() {
   useFocusEffect(
     useCallback(() => {
       refresh();
-    }, [refresh])
+      refreshCurrency();
+    }, [refresh, refreshCurrency])
   );
 
   const handleAddPress = () => {
@@ -100,6 +152,11 @@ export default function SpendingScreen() {
     }
   };
 
+  const handleTimeRangeChange = (range: TimeRange) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTimeRange(range);
+  };
+
   const renderItem = ({ item }: { item: SpendingEntry }) => (
     <SwipeableRow
       onEdit={() => handleEdit(item)}
@@ -113,54 +170,161 @@ export default function SpendingScreen() {
     </SwipeableRow>
   );
 
+  const renderTimeRangeFilter = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.timeFilterContainer}
+      style={styles.timeFilterScroll}
+    >
+      {TIME_RANGE_OPTIONS.map((option) => {
+        const isActive = option.key === timeRange;
+        return (
+          <TouchableOpacity
+            key={option.key}
+            style={[styles.timeFilterPill, isActive && styles.timeFilterPillActive]}
+            onPress={() => handleTimeRangeChange(option.key)}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.timeFilterText,
+                isActive && styles.timeFilterTextActive,
+              ]}
+            >
+              {option.shortLabel}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+
   const renderOverviewHeader = () => (
     <>
-      {/* Stats Grid: 2×2 */}
+      {/* Time Range Filter */}
+      {renderTimeRangeFilter()}
+
+      {/* Monthly Budget Card */}
+      {budget.amount > 0 && (
+        <View style={styles.budgetCard}>
+          <View style={styles.budgetHeader}>
+            <View>
+              <Text style={styles.budgetLabel}>Monthly Budget</Text>
+              <Text style={styles.budgetAmount}>
+                {formatCurrency(monthTotal, currencyCode)} / {formatCurrency(budget.amount, currencyCode)}
+              </Text>
+            </View>
+            <View style={styles.budgetStats}>
+              <Text style={[
+                styles.remainingText,
+                remainingBudget < 0 && { color: colors.accent.red }
+              ]}>
+                {remainingBudget >= 0 ? 'Remaining: ' : 'Over: '}
+                {formatCurrency(Math.abs(remainingBudget), currencyCode)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.progressBarBg}>
+            <View style={[
+              styles.progressBarFill,
+              { width: `${Math.min(budgetProgress * 100, 100)}%` },
+              budgetProgress > 0.9 && { backgroundColor: colors.accent.red },
+              budgetProgress <= 0.9 && budgetProgress > 0.7 && { backgroundColor: colors.accent.amber },
+            ]} />
+          </View>
+        </View>
+      )}
+
+      {/* Quick Stats Row */}
       <View style={styles.statsGrid}>
         <View style={[styles.statCard, styles.statCardPrimary]}>
-          <Text style={styles.statLabel}>SPENT TODAY</Text>
+          <View style={styles.statHeader}>
+            <Ionicons name="today-outline" size={14} color={colors.accent.purple} />
+            <Text style={styles.statLabel}>TODAY</Text>
+          </View>
           <Text style={[styles.statValue, { color: colors.accent.purple }]}>
             {formatCurrency(todayTotal, currencyCode)}
           </Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>THIS WEEK</Text>
+          <View style={styles.statHeader}>
+            <Ionicons name="calendar-outline" size={14} color={colors.text.tertiary} />
+            <Text style={styles.statLabel}>THIS WEEK</Text>
+          </View>
           <Text style={styles.statValue}>
             {formatCurrency(weekTotal, currencyCode)}
           </Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>THIS MONTH</Text>
+          <View style={styles.statHeader}>
+            <Ionicons name="calendar-number-outline" size={14} color={colors.text.tertiary} />
+            <Text style={styles.statLabel}>THIS MONTH</Text>
+          </View>
           <Text style={styles.statValue}>
             {formatCurrency(monthTotal, currencyCode)}
           </Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>DAILY AVG</Text>
+          <View style={styles.statHeader}>
+            <Ionicons name="stats-chart-outline" size={14} color={colors.accent.amber} />
+            <Text style={styles.statLabel}>THIS YEAR</Text>
+          </View>
           <Text style={[styles.statValue, { color: colors.accent.amber }]}>
-            {formatCurrency(dailyAvg, currencyCode)}
+            {formatCurrency(yearTotal, currencyCode)}
           </Text>
         </View>
       </View>
 
-      {/* Weekly Chart */}
-      <WeeklySpendingChart
-        data={weeklyData}
+      {/* Spending Trend Chart */}
+      <SpendingTrendChart
+        timeRange={timeRange}
+        weeklyData={weeklyData}
+        dailyData30={dailyData30}
+        dailyData90={dailyData90}
+        yearlyData={yearlyData}
+        rangeTotal={rangeTotal}
+        previousTotal={comparisonStats.previousTotal}
+        changePercent={comparisonStats.changePercent}
         currencyCode={currencyCode}
-        weekTotal={weekTotal}
+        dailyAvg={dailyAvg}
       />
+
+      {/* Highest Spending Day Insight */}
+      {highestDay.total > 0 && (
+        <View style={styles.insightCard}>
+          <View style={styles.insightIcon}>
+            <Ionicons name="flame-outline" size={18} color={colors.accent.red} />
+          </View>
+          <View style={styles.insightInfo}>
+            <Text style={styles.insightLabel}>Highest Spending Day</Text>
+            <Text style={styles.insightValue}>
+              {formatCurrency(highestDay.total, currencyCode)}
+              <Text style={styles.insightDate}>
+                {' '}· {new Date(highestDay.date + 'T00:00:00').toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                })}
+              </Text>
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Category Breakdown */}
       <CategoryBreakdown
         categories={categoryTotals}
         currencyCode={currencyCode}
+        rangeLabel={rangeLabel}
       />
 
       {/* Section header for entries */}
-      {entries.length > 0 && (
+      {rangeEntries.length > 0 && (
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Entries</Text>
-          <Text style={styles.sectionCount}>{entries.length} total</Text>
+          <Text style={styles.sectionCount}>
+            {rangeEntries.length} in {rangeLabel.toLowerCase()}
+          </Text>
         </View>
       )}
     </>
@@ -168,12 +332,30 @@ export default function SpendingScreen() {
 
   const renderEntriesHeader = () => (
     <>
+      {/* Time Range Filter */}
+      {renderTimeRangeFilter()}
+
       <SearchBar
         value={searchQuery}
         onChangeText={setSearchQuery}
         placeholder="Search spending..."
         accentColor={colors.accent.purple}
       />
+
+      {/* Quick total for filtered view */}
+      <View style={styles.entriesQuickStat}>
+        <Text style={styles.entriesQuickLabel}>
+          {searchQuery
+            ? `Results for "${searchQuery}"`
+            : `${rangeLabel} • ${filteredEntries.length} entries`}
+        </Text>
+        <Text style={styles.entriesQuickTotal}>
+          {formatCurrency(
+            filteredEntries.reduce((sum, e) => sum + e.amount, 0),
+            currencyCode
+          )}
+        </Text>
+      </View>
     </>
   );
 
@@ -263,7 +445,11 @@ export default function SpendingScreen() {
       </View>
 
       <FlatList
-        data={viewMode === 'entries' ? filteredEntries : filteredEntries.slice(0, 10)}
+        data={
+          viewMode === 'entries'
+            ? filteredEntries
+            : filteredEntries.slice(0, 10)
+        }
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
@@ -285,7 +471,7 @@ export default function SpendingScreen() {
               <EmptyState
                 icon="receipt-outline"
                 title="No spending recorded"
-                subtitle="Track your daily expenses to build your streak and understand your spending habits"
+                subtitle="Track your daily expenses to understand your spending habits"
                 actionLabel="Add Spending"
                 onAction={handleAddPress}
                 variant="debts"
@@ -305,7 +491,7 @@ export default function SpendingScreen() {
           )
         }
         ListFooterComponent={
-          viewMode === 'overview' && entries.length > 10 ? (
+          viewMode === 'overview' && rangeEntries.length > 10 ? (
             <TouchableOpacity
               style={styles.viewAllBtn}
               onPress={() => {
@@ -315,7 +501,7 @@ export default function SpendingScreen() {
               activeOpacity={0.7}
             >
               <Text style={styles.viewAllText}>
-                View All {entries.length} Entries
+                View All {rangeEntries.length} Entries
               </Text>
               <Ionicons
                 name="chevron-forward"
@@ -411,13 +597,96 @@ const getStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
     },
 
+    // Time Range Filter
+    timeFilterScroll: {
+      marginBottom: 10,
+    },
+    timeFilterContainer: {
+      paddingHorizontal: 20,
+      gap: 8,
+    },
+    timeFilterPill: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.glass.card,
+      borderWidth: 0.5,
+      borderColor: colors.glass.cardBorder,
+    },
+    timeFilterPillActive: {
+      backgroundColor: isDark
+        ? 'rgba(124,58,237,0.18)'
+        : 'rgba(124,58,237,0.12)',
+      borderColor: isDark
+        ? 'rgba(124,58,237,0.4)'
+        : 'rgba(124,58,237,0.35)',
+    },
+    timeFilterText: {
+      color: colors.text.muted,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    timeFilterTextActive: {
+      color: colors.accent.purple,
+      fontWeight: '700',
+    },
+
+    // Budget Card
+    budgetCard: {
+      marginHorizontal: 20,
+      marginBottom: 16,
+      padding: 18,
+      borderRadius: 20,
+      backgroundColor: colors.glass.card,
+      borderWidth: 0.5,
+      borderColor: colors.glass.cardBorder,
+    },
+    budgetHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+    },
+    budgetLabel: {
+      color: colors.text.tertiary,
+      fontSize: 12,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 4,
+    },
+    budgetAmount: {
+      color: colors.text.primary,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    budgetStats: {
+      alignItems: 'flex-end',
+    },
+    remainingText: {
+      color: colors.accent.green,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    progressBarBg: {
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+      overflow: 'hidden',
+    },
+    progressBarFill: {
+      height: '100%',
+      borderRadius: 4,
+      backgroundColor: colors.accent.purple,
+    },
+
     // Stats Grid
     statsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 10,
       paddingHorizontal: 20,
-      marginTop: 8,
+      marginTop: 4,
       marginBottom: 14,
     },
     statCard: {
@@ -436,19 +705,72 @@ const getStyles = (colors: any, isDark: boolean) =>
         ? 'rgba(124,58,237,0.35)'
         : 'rgba(124,58,237,0.25)',
     },
+    statHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginBottom: 6,
+    },
     statLabel: {
       color: colors.text.tertiary,
       fontSize: 10,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.6,
-      marginBottom: 6,
     },
     statValue: {
       color: colors.text.primary,
       fontSize: 20,
       fontWeight: '800',
       letterSpacing: -0.5,
+    },
+
+    // Insight Card
+    insightCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 20,
+      marginBottom: 14,
+      padding: 14,
+      borderRadius: 18,
+      backgroundColor: isDark
+        ? 'rgba(239,83,80,0.08)'
+        : 'rgba(220,38,38,0.05)',
+      borderWidth: 0.5,
+      borderColor: isDark
+        ? 'rgba(239,83,80,0.2)'
+        : 'rgba(220,38,38,0.15)',
+    },
+    insightIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: isDark
+        ? 'rgba(239,83,80,0.15)'
+        : 'rgba(220,38,38,0.1)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    insightInfo: {
+      flex: 1,
+    },
+    insightLabel: {
+      color: colors.text.muted,
+      fontSize: 11,
+      fontWeight: '600',
+      letterSpacing: 0.3,
+      marginBottom: 2,
+    },
+    insightValue: {
+      color: colors.text.primary,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    insightDate: {
+      color: colors.text.tertiary,
+      fontSize: 13,
+      fontWeight: '500',
     },
 
     // Section header
@@ -469,6 +791,35 @@ const getStyles = (colors: any, isDark: boolean) =>
       color: colors.text.muted,
       fontSize: 12,
       fontWeight: '500',
+    },
+
+    // Entries header
+    entriesQuickStat: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginHorizontal: 20,
+      marginBottom: 12,
+      padding: 12,
+      borderRadius: 14,
+      backgroundColor: isDark
+        ? 'rgba(124,58,237,0.08)'
+        : 'rgba(124,58,237,0.05)',
+      borderWidth: 0.5,
+      borderColor: isDark
+        ? 'rgba(124,58,237,0.2)'
+        : 'rgba(124,58,237,0.15)',
+    },
+    entriesQuickLabel: {
+      color: colors.text.secondary,
+      fontSize: 13,
+      fontWeight: '500',
+      flex: 1,
+    },
+    entriesQuickTotal: {
+      color: colors.accent.purple,
+      fontSize: 16,
+      fontWeight: '800',
     },
 
     // List

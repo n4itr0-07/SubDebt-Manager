@@ -75,6 +75,8 @@ jobs:
           tail -20 "$GRADLE_FILE"
 
       - name: Build Release APK
+        env:
+          EXPO_PUBLIC_EXCHANGE_RATE_API_KEY: ${{ secrets.EXCHANGE_RATE_API_KEY }}
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon \

@@ -3,6 +3,8 @@ import { storage } from '../storage/mmkv';
 import { STORAGE_KEYS } from '../storage/keys';
 import * as Crypto from 'expo-crypto';
 
+export type ConvertFn = (amount: number, fromCurrency: string) => number;
+
 export interface SpendingEntry {
   id: string;
   title: string;
@@ -31,11 +33,43 @@ export interface WeeklyDayData {
   hasEntries: boolean;
 }
 
+export interface MonthlyDayData {
+  dayLabel: string;
+  date: string;
+  total: number;
+  isToday: boolean;
+  hasEntries: boolean;
+}
+
+export interface YearlyMonthData {
+  monthLabel: string;
+  month: number;
+  year: number;
+  total: number;
+  isCurrent: boolean;
+  hasEntries: boolean;
+}
+
+export type TimeRange = '7d' | '30d' | '90d' | '1y' | 'all';
+
+/**
+ * Creates a YYYY-MM-DD key from a Date using LOCAL time parts.
+ * This avoids timezone drift when comparing dates.
+ */
 const getDayKey = (date: Date): string => {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const day = `${date.getDate()}`.padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+/**
+ * Parses a spentAt ISO string into a local-date-only YYYY-MM-DD key.
+ * Handles both full ISO (2026-05-05T18:30:00.000Z) and date-only (2026-05-05) strings.
+ */
+const getEntryDayKey = (spentAt: string): string => {
+  const d = new Date(spentAt);
+  return getDayKey(d);
 };
 
 const addDays = (date: Date, days: number): Date => {
@@ -45,10 +79,29 @@ const addDays = (date: Date, days: number): Date => {
 };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Helper to get all days in the current month up to today
-const getDaysInMonthSoFar = (): number => {
-  return new Date().getDate();
+const getRangeStartDate = (range: TimeRange): Date | null => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  switch (range) {
+    case '7d':
+      return addDays(today, -6);
+    case '30d':
+      return addDays(today, -29);
+    case '90d':
+      return addDays(today, -89);
+    case '1y': {
+      const d = new Date(today);
+      d.setFullYear(d.getFullYear() - 1);
+      d.setDate(d.getDate() + 1);
+      return d;
+    }
+    case 'all':
+      return null;
+    default:
+      return addDays(today, -6);
+  }
 };
 
 export const useDailySpending = () => {
@@ -60,7 +113,10 @@ export const useDailySpending = () => {
       const raw = await storage.getString(STORAGE_KEYS.DAILY_SPENDING);
       if (raw) {
         const parsed = JSON.parse(raw);
-        setEntries(Array.isArray(parsed) ? parsed : []);
+        const list: SpendingEntry[] = Array.isArray(parsed) ? parsed : [];
+        // Sort by spentAt descending (newest first) for consistent display
+        list.sort((a, b) => new Date(b.spentAt).getTime() - new Date(a.spentAt).getTime());
+        setEntries(list);
       } else {
         setEntries([]);
       }
@@ -75,8 +131,12 @@ export const useDailySpending = () => {
   }, [loadEntries]);
 
   const saveEntries = useCallback((entryList: SpendingEntry[]) => {
-    storage.set(STORAGE_KEYS.DAILY_SPENDING, JSON.stringify(entryList));
-    setEntries(entryList);
+    // Always keep sorted by spentAt descending
+    const sorted = [...entryList].sort(
+      (a, b) => new Date(b.spentAt).getTime() - new Date(a.spentAt).getTime()
+    );
+    storage.set(STORAGE_KEYS.DAILY_SPENDING, JSON.stringify(sorted));
+    setEntries(sorted);
   }, []);
 
   const addEntry = useCallback((input: SpendingInput) => {
@@ -108,24 +168,31 @@ export const useDailySpending = () => {
 
   const getEntriesForDay = useCallback((date: Date) => {
     const key = getDayKey(date);
-    return entries.filter((entry) => getDayKey(new Date(entry.spentAt)) === key);
+    return entries.filter((entry) => getEntryDayKey(entry.spentAt) === key);
   }, [entries]);
 
-  const getTotalForDay = useCallback((date: Date) => {
-    return getEntriesForDay(date).reduce((total, entry) => total + entry.amount, 0);
+  const getEntriesForRange = useCallback((range: TimeRange) => {
+    const startDate = getRangeStartDate(range);
+    if (!startDate) return entries; // 'all'
+    const startKey = getDayKey(startDate);
+    return entries.filter((entry) => getEntryDayKey(entry.spentAt) >= startKey);
+  }, [entries]);
+
+  const getTotalForDay = useCallback((date: Date, convertFn?: ConvertFn) => {
+    return getEntriesForDay(date).reduce((total, entry) => total + (convertFn ? convertFn(entry.amount, entry.currency) : entry.amount), 0);
   }, [getEntriesForDay]);
 
-  const getTotalForWeek = useCallback(() => {
+  const getTotalForWeek = useCallback((convertFn?: ConvertFn) => {
     const today = new Date();
     let total = 0;
     for (let i = 0; i < 7; i++) {
       const day = addDays(today, -i);
-      total += getEntriesForDay(day).reduce((sum, e) => sum + e.amount, 0);
+      total += getEntriesForDay(day).reduce((sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount), 0);
     }
     return total;
   }, [getEntriesForDay]);
 
-  const getTotalForMonth = useCallback((date: Date) => {
+  const getTotalForMonth = useCallback((date: Date, convertFn?: ConvertFn) => {
     const month = date.getMonth();
     const year = date.getFullYear();
     return entries
@@ -133,17 +200,29 @@ export const useDailySpending = () => {
         const spent = new Date(entry.spentAt);
         return spent.getMonth() === month && spent.getFullYear() === year;
       })
-      .reduce((total, entry) => total + entry.amount, 0);
+      .reduce((total, entry) => total + (convertFn ? convertFn(entry.amount, entry.currency) : entry.amount), 0);
   }, [entries]);
 
-  const getDailyAverage = useCallback(() => {
-    if (entries.length === 0) return 0;
-    const dayKeys = new Set(entries.map((e) => getDayKey(new Date(e.spentAt))));
+  const getTotalForYear = useCallback((date: Date, convertFn?: ConvertFn) => {
+    const year = date.getFullYear();
+    return entries
+      .filter((entry) => new Date(entry.spentAt).getFullYear() === year)
+      .reduce((total, entry) => total + (convertFn ? convertFn(entry.amount, entry.currency) : entry.amount), 0);
+  }, [entries]);
+
+  const getTotalForRange = useCallback((range: TimeRange, convertFn?: ConvertFn) => {
+    return getEntriesForRange(range).reduce((total, entry) => total + (convertFn ? convertFn(entry.amount, entry.currency) : entry.amount), 0);
+  }, [getEntriesForRange]);
+
+  const getDailyAverage = useCallback((range?: TimeRange, convertFn?: ConvertFn) => {
+    const filtered = range ? getEntriesForRange(range) : entries;
+    if (filtered.length === 0) return 0;
+    const dayKeys = new Set(filtered.map((e) => getEntryDayKey(e.spentAt)));
     const totalDays = dayKeys.size;
     if (totalDays === 0) return 0;
-    const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0);
+    const totalAmount = filtered.reduce((sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount), 0);
     return Math.round((totalAmount / totalDays) * 100) / 100;
-  }, [entries]);
+  }, [entries, getEntriesForRange]);
 
   const getNoSpendDaysThisMonth = useCallback(() => {
     if (entries.length === 0) return 0;
@@ -152,21 +231,18 @@ export const useDailySpending = () => {
     const year = today.getFullYear();
     const month = today.getMonth();
 
-    // Find the earliest entry date to know when they actually started tracking
     const earliestDate = new Date(
       Math.min(...entries.map((e) => new Date(e.spentAt).getTime()))
     );
 
     let trackingDaysThisMonth = 0;
 
-    // If they started tracking in a previous month, they've been tracking all month
     if (
       earliestDate.getFullYear() < year ||
       (earliestDate.getFullYear() === year && earliestDate.getMonth() < month)
     ) {
       trackingDaysThisMonth = today.getDate();
     } else {
-      // They started tracking THIS month
       trackingDaysThisMonth = today.getDate() - earliestDate.getDate() + 1;
     }
 
@@ -176,7 +252,7 @@ export const useDailySpending = () => {
           const d = new Date(e.spentAt);
           return d.getMonth() === month && d.getFullYear() === year;
         })
-        .map((e) => getDayKey(new Date(e.spentAt)))
+        .map((e) => getEntryDayKey(e.spentAt))
     );
 
     return Math.max(0, trackingDaysThisMonth - spendingDayKeysThisMonth.size);
@@ -184,19 +260,17 @@ export const useDailySpending = () => {
 
   const getNoSpendDaysTotal = useCallback(() => {
     if (entries.length === 0) return 0;
-    
-    // Find earliest entry date
+
     const earliestDate = new Date(
       Math.min(...entries.map(e => new Date(e.spentAt).getTime()))
     );
     const today = new Date();
-    
-    // Calculate total days tracked
+
     const diffTime = Math.abs(today.getTime() - earliestDate.getTime());
     const totalDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    
-    const allSpendingDayKeys = new Set(entries.map(e => getDayKey(new Date(e.spentAt))));
-    
+
+    const allSpendingDayKeys = new Set(entries.map(e => getEntryDayKey(e.spentAt)));
+
     return Math.max(0, totalDays - allSpendingDayKeys.size);
   }, [entries]);
 
@@ -209,14 +283,14 @@ export const useDailySpending = () => {
     return `${noSpendDays} no-spend days! Financial Zen! 🧘‍♂️`;
   }, [getNoSpendDaysThisMonth]);
 
-  const getWeeklyData = useCallback((): WeeklyDayData[] => {
+  const getWeeklyData = useCallback((convertFn?: ConvertFn): WeeklyDayData[] => {
     const today = new Date();
     const result: WeeklyDayData[] = [];
 
     for (let i = 6; i >= 0; i--) {
       const day = addDays(today, -i);
       const dayEntries = getEntriesForDay(day);
-      const total = dayEntries.reduce((sum, e) => sum + e.amount, 0);
+      const total = dayEntries.reduce((sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount), 0);
       result.push({
         dayLabel: DAY_LABELS[day.getDay()],
         date: getDayKey(day),
@@ -229,15 +303,164 @@ export const useDailySpending = () => {
     return result;
   }, [getEntriesForDay]);
 
-  const getCategoryTotals = useCallback(() => {
+  /**
+   * Get daily data for last N days — used for 30d/90d charts
+   */
+  const getDailyData = useCallback((days: number, convertFn?: ConvertFn): MonthlyDayData[] => {
+    const today = new Date();
+    const result: MonthlyDayData[] = [];
+
+    for (let i = days - 1; i >= 0; i--) {
+      const day = addDays(today, -i);
+      const dayEntries = getEntriesForDay(day);
+      const total = dayEntries.reduce((sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount), 0);
+      const dayNum = day.getDate();
+      const monthLabel = MONTH_LABELS[day.getMonth()];
+      result.push({
+        dayLabel: dayNum === 1 ? `${monthLabel} ${dayNum}` : `${dayNum}`,
+        date: getDayKey(day),
+        total,
+        isToday: i === 0,
+        hasEntries: dayEntries.length > 0,
+      });
+    }
+
+    return result;
+  }, [getEntriesForDay]);
+
+  /**
+   * Get monthly totals for the last 12 months — used for yearly chart
+   */
+  const getYearlyMonthlyData = useCallback((convertFn?: ConvertFn): YearlyMonthData[] => {
+    const today = new Date();
+    const result: YearlyMonthData[] = [];
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    for (let i = 11; i >= 0; i--) {
+      let month = currentMonth - i;
+      let year = currentYear;
+      while (month < 0) {
+        month += 12;
+        year -= 1;
+      }
+
+      const monthEntries = entries.filter((entry) => {
+        const spent = new Date(entry.spentAt);
+        return spent.getMonth() === month && spent.getFullYear() === year;
+      });
+      const total = monthEntries.reduce((sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount), 0);
+
+      result.push({
+        monthLabel: MONTH_LABELS[month],
+        month,
+        year,
+        total,
+        isCurrent: i === 0,
+        hasEntries: monthEntries.length > 0,
+      });
+    }
+
+    return result;
+  }, [entries]);
+
+  const getCategoryTotals = useCallback((range?: TimeRange, convertFn?: ConvertFn) => {
+    const filtered = range ? getEntriesForRange(range) : entries;
     const totals = new Map<string, number>();
-    entries.forEach((entry) => {
-      totals.set(entry.category, (totals.get(entry.category) || 0) + entry.amount);
+    filtered.forEach((entry) => {
+      totals.set(entry.category, (totals.get(entry.category) || 0) + (convertFn ? convertFn(entry.amount, entry.currency) : entry.amount));
     });
     return Array.from(totals.entries())
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
+  }, [entries, getEntriesForRange]);
+
+  /**
+   * Get comparison stats vs previous period
+   */
+  const getComparisonStats = useCallback((range: TimeRange, convertFn?: ConvertFn) => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    let currentStart: Date;
+    let previousStart: Date;
+    let previousEnd: Date;
+
+    switch (range) {
+      case '7d':
+        currentStart = addDays(now, -6);
+        previousEnd = addDays(currentStart, -1);
+        previousStart = addDays(previousEnd, -6);
+        break;
+      case '30d':
+        currentStart = addDays(now, -29);
+        previousEnd = addDays(currentStart, -1);
+        previousStart = addDays(previousEnd, -29);
+        break;
+      case '90d':
+        currentStart = addDays(now, -89);
+        previousEnd = addDays(currentStart, -1);
+        previousStart = addDays(previousEnd, -89);
+        break;
+      case '1y': {
+        currentStart = new Date(now);
+        currentStart.setFullYear(currentStart.getFullYear() - 1);
+        currentStart.setDate(currentStart.getDate() + 1);
+        previousEnd = addDays(currentStart, -1);
+        previousStart = new Date(previousEnd);
+        previousStart.setFullYear(previousStart.getFullYear() - 1);
+        break;
+      }
+      default:
+        return { currentTotal: 0, previousTotal: 0, changePercent: 0 };
+    }
+
+    const currentKey = getDayKey(currentStart);
+    const prevStartKey = getDayKey(previousStart);
+    const prevEndKey = getDayKey(previousEnd);
+
+    const currentTotal = entries
+      .filter((e) => getEntryDayKey(e.spentAt) >= currentKey)
+      .reduce((sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount), 0);
+
+    const previousTotal = entries
+      .filter((e) => {
+        const key = getEntryDayKey(e.spentAt);
+        return key >= prevStartKey && key <= prevEndKey;
+      })
+      .reduce((sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount), 0);
+
+    const changePercent = previousTotal > 0
+      ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
+      : currentTotal > 0 ? 100 : 0;
+
+    return { currentTotal, previousTotal, changePercent };
   }, [entries]);
+
+  /**
+   * Get the highest spending day in a range
+   */
+  const getHighestSpendingDay = useCallback((range: TimeRange, convertFn?: ConvertFn) => {
+    const filtered = getEntriesForRange(range);
+    if (filtered.length === 0) return { date: '', total: 0 };
+
+    const dayMap = new Map<string, number>();
+    filtered.forEach((entry) => {
+      const key = getEntryDayKey(entry.spentAt);
+      dayMap.set(key, (dayMap.get(key) || 0) + (convertFn ? convertFn(entry.amount, entry.currency) : entry.amount));
+    });
+
+    let maxKey = '';
+    let maxTotal = 0;
+    dayMap.forEach((total, key) => {
+      if (total > maxTotal) {
+        maxTotal = total;
+        maxKey = key;
+      }
+    });
+
+    return { date: maxKey, total: maxTotal };
+  }, [getEntriesForRange]);
 
   return {
     entries,
@@ -247,15 +470,22 @@ export const useDailySpending = () => {
     deleteEntry,
     getEntryById,
     getEntriesForDay,
+    getEntriesForRange,
     getTotalForDay,
     getTotalForWeek,
     getTotalForMonth,
+    getTotalForYear,
+    getTotalForRange,
     getDailyAverage,
     getNoSpendDaysThisMonth,
     getNoSpendDaysTotal,
     getSavingMessage,
     getWeeklyData,
+    getDailyData,
+    getYearlyMonthlyData,
     getCategoryTotals,
+    getComparisonStats,
+    getHighestSpendingDay,
     refresh: loadEntries,
   };
 };

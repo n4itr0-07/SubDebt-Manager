@@ -1,8 +1,12 @@
 import { useTheme } from '../hooks/useTheme';
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatCurrency } from '../utils/dateHelpers';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface CategoryTotal {
   category: string;
@@ -12,6 +16,7 @@ interface CategoryTotal {
 interface CategoryBreakdownProps {
   categories: CategoryTotal[];
   currencyCode: string;
+  rangeLabel?: string;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -37,20 +42,63 @@ const CATEGORY_ICONS: Record<string, string> = {
 export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
   categories,
   currencyCode,
+  rangeLabel,
 }) => {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
+  const [expanded, setExpanded] = useState(false);
 
   if (categories.length === 0) return null;
 
   const maxTotal = Math.max(...categories.map((c) => c.total), 1);
   const grandTotal = categories.reduce((sum, c) => sum + c.total, 0);
 
+  const visibleCategories = expanded ? categories : categories.slice(0, 4);
+  const hasMore = categories.length > 4;
+
+  const toggleExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(!expanded);
+  };
+
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>CATEGORY BREAKDOWN</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>
+          {rangeLabel ? `SPENDING BY CATEGORY` : 'CATEGORY BREAKDOWN'}
+        </Text>
+        {rangeLabel && (
+          <View style={styles.rangePill}>
+            <Text style={styles.rangePillText}>{rangeLabel}</Text>
+          </View>
+        )}
+      </View>
 
-      {categories.slice(0, 7).map((cat, index) => {
+      {/* Donut-style summary row */}
+      <View style={styles.summaryRow}>
+        {categories.slice(0, 3).map((cat) => {
+          const color = CATEGORY_COLORS[cat.category] || '#78909C';
+          const percentage = grandTotal > 0 ? Math.round((cat.total / grandTotal) * 100) : 0;
+          return (
+            <View key={cat.category} style={styles.summaryItem}>
+              <View style={[styles.summaryDot, { backgroundColor: color }]} />
+              <Text style={styles.summaryLabel} numberOfLines={1}>
+                {cat.category}
+              </Text>
+              <Text style={[styles.summaryPct, { color }]}>{percentage}%</Text>
+            </View>
+          );
+        })}
+        {categories.length > 3 && (
+          <View style={styles.summaryItem}>
+            <View style={[styles.summaryDot, { backgroundColor: colors.text.muted }]} />
+            <Text style={styles.summaryLabel}>+{categories.length - 3}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Category rows */}
+      {visibleCategories.map((cat) => {
         const color = CATEGORY_COLORS[cat.category] || '#78909C';
         const icon = CATEGORY_ICONS[cat.category] || 'ellipsis-horizontal-outline';
         const percentage = grandTotal > 0 ? Math.round((cat.total / grandTotal) * 100) : 0;
@@ -84,6 +132,24 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
           </View>
         );
       })}
+
+      {/* Show more / less toggle */}
+      {hasMore && (
+        <TouchableOpacity
+          style={styles.toggleRow}
+          onPress={toggleExpanded}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.toggleText}>
+            {expanded ? 'Show Less' : `Show All ${categories.length} Categories`}
+          </Text>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={14}
+            color={colors.accent.purple}
+          />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -99,12 +165,61 @@ const getStyles = (colors: any, isDark: boolean) =>
       borderWidth: 0.5,
       borderColor: colors.glass.cardBorder,
     },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
     title: {
       color: colors.text.tertiary,
       fontSize: 11,
       fontWeight: '600',
       letterSpacing: 0.8,
+    },
+    rangePill: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 8,
+      backgroundColor: isDark
+        ? 'rgba(124,58,237,0.12)'
+        : 'rgba(124,58,237,0.08)',
+    },
+    rangePillText: {
+      color: colors.accent.purple,
+      fontSize: 9,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      gap: 12,
       marginBottom: 16,
+      paddingBottom: 14,
+      borderBottomWidth: 0.5,
+      borderBottomColor: isDark
+        ? 'rgba(255,255,255,0.06)'
+        : 'rgba(0,0,0,0.06)',
+    },
+    summaryItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    summaryDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    summaryLabel: {
+      color: colors.text.muted,
+      fontSize: 11,
+      fontWeight: '500',
+      maxWidth: 60,
+    },
+    summaryPct: {
+      fontSize: 11,
+      fontWeight: '700',
     },
     row: {
       flexDirection: 'row',
@@ -158,5 +273,21 @@ const getStyles = (colors: any, isDark: boolean) =>
       color: colors.text.muted,
       fontSize: 11,
       fontWeight: '500',
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingTop: 4,
+      borderTopWidth: 0.5,
+      borderTopColor: isDark
+        ? 'rgba(255,255,255,0.06)'
+        : 'rgba(0,0,0,0.06)',
+    },
+    toggleText: {
+      color: colors.accent.purple,
+      fontSize: 12,
+      fontWeight: '600',
     },
   });

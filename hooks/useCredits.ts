@@ -2,6 +2,16 @@ import { useState, useCallback, useEffect } from 'react';
 import { storage } from '../storage/mmkv';
 import { STORAGE_KEYS } from '../storage/keys';
 import * as Crypto from 'expo-crypto';
+import { scheduleDebtReminder, cancelNotification } from '../utils/notificationHelpers';
+
+export type ConvertFn = (amount: number, fromCurrency: string) => number;
+
+export interface CreditPayment {
+  id: string;
+  amount: number;
+  returnedDate: string;
+  notes?: string;
+}
 
 export interface Credit {
   id: string;
@@ -15,6 +25,8 @@ export interface Credit {
   isReturned: boolean;
   returnedDate?: string;
   notes?: string;
+  payments?: CreditPayment[];
+  notificationId?: string;
   createdAt: string;
 }
 
@@ -58,11 +70,19 @@ export const useCredits = () => {
     setCredits(creditsList);
   }, []);
 
-  const addCredit = useCallback((input: CreditInput) => {
+  const addCredit = useCallback(async (input: CreditInput) => {
+    const id = Crypto.randomUUID();
+    let notificationId: string | undefined;
+
+    if (!input.isReturned && input.expectedReturnDate) {
+      notificationId = await scheduleDebtReminder(id, input.personName, input.expectedReturnDate) || undefined;
+    }
+
     const newCredit: Credit = {
       ...input,
-      id: Crypto.randomUUID(),
+      id,
       isReturned: input.isReturned ?? false,
+      notificationId,
       createdAt: new Date().toISOString(),
     };
 
@@ -71,33 +91,105 @@ export const useCredits = () => {
     return newCredit;
   }, [credits, saveCredits]);
 
-  const updateCredit = useCallback((id: string, updates: Partial<CreditInput>) => {
+  const updateCredit = useCallback(async (id: string, updates: Partial<CreditInput>) => {
+    const creditToUpdate = credits.find(c => c.id === id);
+    if (!creditToUpdate) return;
+
+    let newNotificationId = creditToUpdate.notificationId;
+
+    if (
+      (updates.personName && updates.personName !== creditToUpdate.personName) ||
+      (updates.expectedReturnDate && updates.expectedReturnDate !== creditToUpdate.expectedReturnDate) ||
+      (updates.isReturned !== undefined && updates.isReturned !== creditToUpdate.isReturned)
+    ) {
+      if (creditToUpdate.notificationId) {
+        await cancelNotification(creditToUpdate.notificationId);
+      }
+
+      const updatedName = updates.personName || creditToUpdate.personName;
+      const updatedDate = updates.expectedReturnDate || creditToUpdate.expectedReturnDate;
+      const updatedIsReturned = updates.isReturned !== undefined ? updates.isReturned : creditToUpdate.isReturned;
+
+      if (!updatedIsReturned && updatedDate) {
+        newNotificationId = await scheduleDebtReminder(id, updatedName, updatedDate) || undefined;
+      } else {
+        newNotificationId = undefined;
+      }
+    }
+
     const updated = credits.map((credit) =>
-      credit.id === id ? { ...credit, ...updates } : credit
+      credit.id === id ? { ...credit, ...updates, notificationId: newNotificationId } : credit
     );
     saveCredits(updated);
   }, [credits, saveCredits]);
 
-  const deleteCredit = useCallback((id: string) => {
+  const deleteCredit = useCallback(async (id: string) => {
+    const creditToDelete = credits.find(c => c.id === id);
+    if (creditToDelete?.notificationId) {
+      await cancelNotification(creditToDelete.notificationId);
+    }
     const updated = credits.filter((credit) => credit.id !== id);
     saveCredits(updated);
   }, [credits, saveCredits]);
 
-  const markCreditAsReturned = useCallback((id: string) => {
+  const markCreditAsReturned = useCallback(async (id: string) => {
+    const creditToUpdate = credits.find(c => c.id === id);
+    if (creditToUpdate?.notificationId) {
+      await cancelNotification(creditToUpdate.notificationId);
+    }
+
     const updated = credits.map((credit) =>
       credit.id === id
-        ? { ...credit, isReturned: true, returnedDate: new Date().toISOString() }
+        ? { ...credit, isReturned: true, returnedDate: new Date().toISOString(), notificationId: undefined }
         : credit
     );
     saveCredits(updated);
   }, [credits, saveCredits]);
 
-  const markCreditAsPending = useCallback((id: string) => {
+  const markCreditAsPending = useCallback(async (id: string) => {
+    const creditToUpdate = credits.find(c => c.id === id);
+    if (!creditToUpdate) return;
+
+    let newNotificationId: string | undefined;
+    if (creditToUpdate.expectedReturnDate) {
+      newNotificationId = await scheduleDebtReminder(id, creditToUpdate.personName, creditToUpdate.expectedReturnDate) || undefined;
+    }
+
     const updated = credits.map((credit) =>
       credit.id === id
-        ? { ...credit, isReturned: false, returnedDate: undefined }
+        ? { ...credit, isReturned: false, returnedDate: undefined, notificationId: newNotificationId }
         : credit
     );
+    saveCredits(updated);
+  }, [credits, saveCredits]);
+
+  const getRemainingAmount = useCallback((credit: Credit) => {
+    const totalReturned = (credit.payments || []).reduce((sum, p) => sum + p.amount, 0);
+    return Math.max(0, credit.amount - totalReturned);
+  }, []);
+
+  const addPayment = useCallback((creditId: string, paymentAmount: number, notes?: string) => {
+    const updated = credits.map((credit) => {
+      if (credit.id === creditId) {
+        const newPayment: CreditPayment = {
+          id: Crypto.randomUUID(),
+          amount: paymentAmount,
+          returnedDate: new Date().toISOString(),
+          notes,
+        };
+        const payments = [...(credit.payments || []), newPayment];
+        const remaining = credit.amount - payments.reduce((sum, p) => sum + p.amount, 0);
+        const isReturned = remaining <= 0;
+        
+        return {
+          ...credit,
+          payments,
+          isReturned,
+          returnedDate: isReturned ? new Date().toISOString() : credit.returnedDate,
+        };
+      }
+      return credit;
+    });
     saveCredits(updated);
   }, [credits, saveCredits]);
 
@@ -105,16 +197,22 @@ export const useCredits = () => {
     return credits.find((credit) => credit.id === id);
   }, [credits]);
 
-  const getTotalPendingAmount = useCallback(() => {
+  const getTotalPendingAmount = useCallback((convertFn?: ConvertFn) => {
     return credits
       .filter((credit) => !credit.isReturned)
-      .reduce((total, credit) => total + credit.amount, 0);
-  }, [credits]);
+      .reduce((total, credit) => {
+        const remaining = getRemainingAmount(credit);
+        return total + (convertFn ? convertFn(remaining, credit.currency) : remaining);
+      }, 0);
+  }, [credits, getRemainingAmount]);
 
-  const getTotalReturnedAmount = useCallback(() => {
-    return credits
-      .filter((credit) => credit.isReturned)
-      .reduce((total, credit) => total + credit.amount, 0);
+  const getTotalReturnedAmount = useCallback((convertFn?: ConvertFn) => {
+    return credits.reduce((total, credit) => {
+      const paymentsTotal = (credit.payments || []).reduce((sum, p) => {
+        return sum + (convertFn ? convertFn(p.amount, credit.currency) : p.amount);
+      }, 0);
+      return total + paymentsTotal;
+    }, 0);
   }, [credits]);
 
   return {
@@ -125,6 +223,8 @@ export const useCredits = () => {
     deleteCredit,
     markCreditAsReturned,
     markCreditAsPending,
+    addPayment,
+    getRemainingAmount,
     getCreditById,
     getTotalPendingAmount,
     getTotalReturnedAmount,

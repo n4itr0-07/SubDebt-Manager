@@ -1,16 +1,71 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, Animated, Image } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, Animated, Image, TouchableOpacity, AppState } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { hydrateStorage } from '../storage/mmkv';
+import { Ionicons } from '@expo/vector-icons';
 
 SplashScreen.preventAutoHideAsync();
 
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from '../hooks/useTheme';
+import { registerForPushNotificationsAsync } from '../utils/notificationHelpers';
+import { authenticate } from '../utils/authHelpers';
 
 function AppLayout() {
   const { colors, isDark } = useTheme();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
+  
+  const handleAuth = async () => {
+    setIsAuthenticating(true);
+    const success = await authenticate();
+    setIsAuthenticated(success);
+    setIsAuthenticating(false);
+  };
+
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+    handleAuth();
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        handleAuth();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  if (isAuthenticating) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background.primary }]}>
+        <ActivityIndicator size="large" color={colors.accent.blue} />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background.primary }]}>
+        <Ionicons name="lock-closed" size={64} color={colors.accent.blue} style={{ marginBottom: 20 }} />
+        <Text style={{ color: colors.text.primary, fontSize: 18, marginBottom: 30 }}>App Locked</Text>
+        <TouchableOpacity 
+          onPress={handleAuth}
+          style={{ 
+            backgroundColor: colors.accent.blue, 
+            paddingHorizontal: 30, 
+            paddingVertical: 12, 
+            borderRadius: 25 
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Unlock</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />

@@ -3,6 +3,9 @@ import { storage } from '../storage/mmkv';
 import { STORAGE_KEYS } from '../storage/keys';
 import * as Crypto from 'expo-crypto';
 import { getIconKeyFromName } from '../utils/subscriptionIcons';
+import { scheduleSubscriptionReminder, cancelNotification } from '../utils/notificationHelpers';
+
+export type ConvertFn = (amount: number, fromCurrency: string) => number;
 
 export type BillingCycle = 'monthly' | 'yearly' | 'weekly' | 'custom';
 
@@ -19,6 +22,7 @@ export interface Subscription {
   color?: string;
   iconKey?: string;
   isActive: boolean;
+  notificationId?: string;
   createdAt: string;
 }
 
@@ -63,11 +67,19 @@ export const useSubscriptions = () => {
     setSubscriptions(subs);
   }, []);
 
-  const addSubscription = useCallback((input: SubscriptionInput) => {
+  const addSubscription = useCallback(async (input: SubscriptionInput) => {
+    const id = Crypto.randomUUID();
+    let notificationId: string | undefined;
+    
+    if (input.isActive && input.expiryDate) {
+      notificationId = await scheduleSubscriptionReminder(id, input.name, input.expiryDate) || undefined;
+    }
+
     const newSubscription: Subscription = {
       ...input,
-      id: Crypto.randomUUID(),
+      id,
       iconKey: getIconKeyFromName(input.name),
+      notificationId,
       createdAt: new Date().toISOString(),
     };
 
@@ -76,10 +88,36 @@ export const useSubscriptions = () => {
     return newSubscription;
   }, [subscriptions, saveSubscriptions]);
 
-  const updateSubscription = useCallback((id: string, updates: Partial<SubscriptionInput>) => {
+  const updateSubscription = useCallback(async (id: string, updates: Partial<SubscriptionInput>) => {
+    const subToUpdate = subscriptions.find(s => s.id === id);
+    if (!subToUpdate) return;
+
+    let newNotificationId = subToUpdate.notificationId;
+
+    // If name or expiry date or active status changed, reschedule notification
+    if (
+      (updates.name && updates.name !== subToUpdate.name) ||
+      (updates.expiryDate && updates.expiryDate !== subToUpdate.expiryDate) ||
+      (updates.isActive !== undefined && updates.isActive !== subToUpdate.isActive)
+    ) {
+      if (subToUpdate.notificationId) {
+        await cancelNotification(subToUpdate.notificationId);
+      }
+      
+      const updatedName = updates.name || subToUpdate.name;
+      const updatedExpiry = updates.expiryDate || subToUpdate.expiryDate;
+      const updatedIsActive = updates.isActive !== undefined ? updates.isActive : subToUpdate.isActive;
+
+      if (updatedIsActive && updatedExpiry) {
+        newNotificationId = await scheduleSubscriptionReminder(id, updatedName, updatedExpiry) || undefined;
+      } else {
+        newNotificationId = undefined;
+      }
+    }
+
     const updated = subscriptions.map((sub) => {
       if (sub.id === id) {
-        const updatedSub = { ...sub, ...updates };
+        const updatedSub = { ...sub, ...updates, notificationId: newNotificationId };
         if (updates.name) {
           updatedSub.iconKey = getIconKeyFromName(updates.name);
         }
@@ -90,14 +128,35 @@ export const useSubscriptions = () => {
     saveSubscriptions(updated);
   }, [subscriptions, saveSubscriptions]);
 
-  const deleteSubscription = useCallback((id: string) => {
+  const deleteSubscription = useCallback(async (id: string) => {
+    const subToDelete = subscriptions.find(s => s.id === id);
+    if (subToDelete?.notificationId) {
+      await cancelNotification(subToDelete.notificationId);
+    }
     const updated = subscriptions.filter((sub) => sub.id !== id);
     saveSubscriptions(updated);
   }, [subscriptions, saveSubscriptions]);
 
-  const toggleSubscriptionActive = useCallback((id: string) => {
+  const toggleSubscriptionActive = useCallback(async (id: string) => {
+    const subToToggle = subscriptions.find(s => s.id === id);
+    if (!subToToggle) return;
+
+    let newNotificationId = subToToggle.notificationId;
+    if (subToToggle.isActive) {
+      // Deactivating
+      if (subToToggle.notificationId) {
+        await cancelNotification(subToToggle.notificationId);
+      }
+      newNotificationId = undefined;
+    } else {
+      // Activating
+      if (subToToggle.expiryDate) {
+        newNotificationId = await scheduleSubscriptionReminder(id, subToToggle.name, subToToggle.expiryDate) || undefined;
+      }
+    }
+
     const updated = subscriptions.map((sub) =>
-      sub.id === id ? { ...sub, isActive: !sub.isActive } : sub
+      sub.id === id ? { ...sub, isActive: !sub.isActive, notificationId: newNotificationId } : sub
     );
     saveSubscriptions(updated);
   }, [subscriptions, saveSubscriptions]);
@@ -106,7 +165,7 @@ export const useSubscriptions = () => {
     return subscriptions.find((sub) => sub.id === id);
   }, [subscriptions]);
 
-  const getTotalAmount = useCallback(() => {
+  const getTotalAmount = useCallback((convertFn?: ConvertFn) => {
     const now = Date.now();
     return subscriptions
       .filter((sub) => {
@@ -116,7 +175,7 @@ export const useSubscriptions = () => {
         // Check if not expired
         return new Date(sub.expiryDate).getTime() > now;
       })
-      .reduce((total, sub) => total + sub.amount, 0);
+      .reduce((total, sub) => total + (convertFn ? convertFn(sub.amount, sub.currency) : sub.amount), 0);
   }, [subscriptions]);
 
   return {

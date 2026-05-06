@@ -9,9 +9,12 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
   
   <br />
-  <a href="https://github.com/SubDebt-Manager/SubDebt-Manager/releases/latest">
-    <img src="https://img.shields.io/badge/Download_Latest_APK-FF2D20?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
-  </a>
+  
+  ### 📥 Direct Downloads (v1.2.0)
+  <a href="https://github.com/n4itr0-07/SubDebt-Manager/releases/download/v1.2.0/SubDebt-universal.apk"><img src="https://img.shields.io/badge/Universal_APK-2EA043?style=for-the-badge&logo=android&logoColor=white" alt="Download Universal" /></a>
+  <a href="https://github.com/n4itr0-07/SubDebt-Manager/releases/download/v1.2.0/SubDebt-arm64-v8a.apk"><img src="https://img.shields.io/badge/ARM64--v8a-238636?style=for-the-badge&logo=android&logoColor=white" alt="Download ARM64" /></a>
+  <a href="https://github.com/n4itr0-07/SubDebt-Manager/releases/download/v1.2.0/SubDebt-armeabi-v7a.apk"><img src="https://img.shields.io/badge/ARM--v7a-238636?style=for-the-badge&logo=android&logoColor=white" alt="Download ARM" /></a>
+  <a href="https://github.com/n4itr0-07/SubDebt-Manager/releases/download/v1.2.0/SubDebt-x86_64.apk"><img src="https://img.shields.io/badge/x86__64-238636?style=for-the-badge&logo=android&logoColor=white" alt="Download x86_64" /></a>
 
 </div>
 

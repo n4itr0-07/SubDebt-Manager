@@ -2,6 +2,16 @@ import { useState, useCallback, useEffect } from 'react';
 import { storage } from '../storage/mmkv';
 import { STORAGE_KEYS } from '../storage/keys';
 import * as Crypto from 'expo-crypto';
+import { scheduleDebtReminder, cancelNotification } from '../utils/notificationHelpers';
+
+export type ConvertFn = (amount: number, fromCurrency: string) => number;
+
+export interface DebtPayment {
+  id: string;
+  amount: number;
+  paidDate: string;
+  notes?: string;
+}
 
 export interface Debt {
   id: string;
@@ -15,6 +25,8 @@ export interface Debt {
   isPaid: boolean;
   paidDate?: string;
   notes?: string;
+  payments?: DebtPayment[];
+  notificationId?: string;
   createdAt: string;
 }
 
@@ -58,11 +70,19 @@ export const useDebts = () => {
     setDebts(debtsList);
   }, []);
 
-  const addDebt = useCallback((input: DebtInput) => {
+  const addDebt = useCallback(async (input: DebtInput) => {
+    const id = Crypto.randomUUID();
+    let notificationId: string | undefined;
+
+    if (!input.isPaid && input.dueDate) {
+      notificationId = await scheduleDebtReminder(id, input.personName, input.dueDate) || undefined;
+    }
+
     const newDebt: Debt = {
       ...input,
-      id: Crypto.randomUUID(),
+      id,
       isPaid: input.isPaid ?? false,
+      notificationId,
       createdAt: new Date().toISOString(),
     };
 
@@ -71,33 +91,105 @@ export const useDebts = () => {
     return newDebt;
   }, [debts, saveDebts]);
 
-  const updateDebt = useCallback((id: string, updates: Partial<DebtInput>) => {
+  const updateDebt = useCallback(async (id: string, updates: Partial<DebtInput>) => {
+    const debtToUpdate = debts.find(d => d.id === id);
+    if (!debtToUpdate) return;
+
+    let newNotificationId = debtToUpdate.notificationId;
+
+    if (
+      (updates.personName && updates.personName !== debtToUpdate.personName) ||
+      (updates.dueDate && updates.dueDate !== debtToUpdate.dueDate) ||
+      (updates.isPaid !== undefined && updates.isPaid !== debtToUpdate.isPaid)
+    ) {
+      if (debtToUpdate.notificationId) {
+        await cancelNotification(debtToUpdate.notificationId);
+      }
+
+      const updatedName = updates.personName || debtToUpdate.personName;
+      const updatedDueDate = updates.dueDate || debtToUpdate.dueDate;
+      const updatedIsPaid = updates.isPaid !== undefined ? updates.isPaid : debtToUpdate.isPaid;
+
+      if (!updatedIsPaid && updatedDueDate) {
+        newNotificationId = await scheduleDebtReminder(id, updatedName, updatedDueDate) || undefined;
+      } else {
+        newNotificationId = undefined;
+      }
+    }
+
     const updated = debts.map((debt) =>
-      debt.id === id ? { ...debt, ...updates } : debt
+      debt.id === id ? { ...debt, ...updates, notificationId: newNotificationId } : debt
     );
     saveDebts(updated);
   }, [debts, saveDebts]);
 
-  const deleteDebt = useCallback((id: string) => {
+  const deleteDebt = useCallback(async (id: string) => {
+    const debtToDelete = debts.find(d => d.id === id);
+    if (debtToDelete?.notificationId) {
+      await cancelNotification(debtToDelete.notificationId);
+    }
     const updated = debts.filter((debt) => debt.id !== id);
     saveDebts(updated);
   }, [debts, saveDebts]);
 
-  const markDebtAsPaid = useCallback((id: string) => {
+  const markDebtAsPaid = useCallback(async (id: string) => {
+    const debtToUpdate = debts.find(d => d.id === id);
+    if (debtToUpdate?.notificationId) {
+      await cancelNotification(debtToUpdate.notificationId);
+    }
+
     const updated = debts.map((debt) =>
       debt.id === id
-        ? { ...debt, isPaid: true, paidDate: new Date().toISOString() }
+        ? { ...debt, isPaid: true, paidDate: new Date().toISOString(), notificationId: undefined }
         : debt
     );
     saveDebts(updated);
   }, [debts, saveDebts]);
 
-  const markDebtAsUnpaid = useCallback((id: string) => {
+  const markDebtAsUnpaid = useCallback(async (id: string) => {
+    const debtToUpdate = debts.find(d => d.id === id);
+    if (!debtToUpdate) return;
+
+    let newNotificationId: string | undefined;
+    if (debtToUpdate.dueDate) {
+      newNotificationId = await scheduleDebtReminder(id, debtToUpdate.personName, debtToUpdate.dueDate) || undefined;
+    }
+
     const updated = debts.map((debt) =>
       debt.id === id
-        ? { ...debt, isPaid: false, paidDate: undefined }
+        ? { ...debt, isPaid: false, paidDate: undefined, notificationId: newNotificationId }
         : debt
     );
+    saveDebts(updated);
+  }, [debts, saveDebts]);
+
+  const getRemainingAmount = useCallback((debt: Debt) => {
+    const totalPaid = (debt.payments || []).reduce((sum, p) => sum + p.amount, 0);
+    return Math.max(0, debt.amount - totalPaid);
+  }, []);
+
+  const addPayment = useCallback((debtId: string, paymentAmount: number, notes?: string) => {
+    const updated = debts.map((debt) => {
+      if (debt.id === debtId) {
+        const newPayment: DebtPayment = {
+          id: Crypto.randomUUID(),
+          amount: paymentAmount,
+          paidDate: new Date().toISOString(),
+          notes,
+        };
+        const payments = [...(debt.payments || []), newPayment];
+        const remaining = debt.amount - payments.reduce((sum, p) => sum + p.amount, 0);
+        const isPaid = remaining <= 0;
+        
+        return {
+          ...debt,
+          payments,
+          isPaid,
+          paidDate: isPaid ? new Date().toISOString() : debt.paidDate,
+        };
+      }
+      return debt;
+    });
     saveDebts(updated);
   }, [debts, saveDebts]);
 
@@ -105,16 +197,22 @@ export const useDebts = () => {
     return debts.find((debt) => debt.id === id);
   }, [debts]);
 
-  const getTotalPendingAmount = useCallback(() => {
+  const getTotalPendingAmount = useCallback((convertFn?: ConvertFn) => {
     return debts
       .filter((debt) => !debt.isPaid)
-      .reduce((total, debt) => total + debt.amount, 0);
-  }, [debts]);
+      .reduce((total, debt) => {
+        const remaining = getRemainingAmount(debt);
+        return total + (convertFn ? convertFn(remaining, debt.currency) : remaining);
+      }, 0);
+  }, [debts, getRemainingAmount]);
 
-  const getTotalPaidAmount = useCallback(() => {
-    return debts
-      .filter((debt) => debt.isPaid)
-      .reduce((total, debt) => total + debt.amount, 0);
+  const getTotalPaidAmount = useCallback((convertFn?: ConvertFn) => {
+    return debts.reduce((total, debt) => {
+      const paymentsTotal = (debt.payments || []).reduce((sum, p) => {
+        return sum + (convertFn ? convertFn(p.amount, debt.currency) : p.amount);
+      }, 0);
+      return total + paymentsTotal;
+    }, 0);
   }, [debts]);
 
   return {
@@ -125,6 +223,8 @@ export const useDebts = () => {
     deleteDebt,
     markDebtAsPaid,
     markDebtAsUnpaid,
+    addPayment,
+    getRemainingAmount,
     getDebtById,
     getTotalPendingAmount,
     getTotalPaidAmount,

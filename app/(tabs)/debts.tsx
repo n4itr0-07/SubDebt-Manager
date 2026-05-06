@@ -32,7 +32,7 @@ export default function DebtsScreen() {
   const styles = getStyles(colors);
   const router = useRouter();
   const { debts, isLoaded, deleteDebt, markDebtAsPaid, getTotalPendingAmount, refresh } = useDebts();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, convertAmount, refresh: refreshCurrency } = useCurrency();
   const [filter, setFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export default function DebtsScreen() {
     return result;
   }, [debts, filter, searchQuery]);
 
-  const totalPending = getTotalPendingAmount();
+  const totalPending = getTotalPendingAmount(convertAmount);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -71,7 +71,8 @@ export default function DebtsScreen() {
   useFocusEffect(
     useCallback(() => {
       refresh();
-    }, [refresh])
+      refreshCurrency();
+    }, [refresh, refreshCurrency])
   );
 
   const handleAddPress = () => {

@@ -65,6 +65,32 @@ export const pickAndImportData = async (mode: 'merge' | 'replace' = 'merge'): Pr
       };
     }
 
+    return await importDataObj(data, mode);
+  } catch (error) {
+    return {
+      success: false,
+      subscriptionsCount: 0,
+      debtsCount: 0,
+      creditsCount: 0,
+      spendingCount: 0,
+      error: error instanceof Error ? error.message : 'Import failed',
+    };
+  }
+};
+
+export const importDataObj = async (data: ImportData, mode: 'merge' | 'replace' = 'merge'): Promise<ImportResult> => {
+  try {
+    if (!data.version || !Array.isArray(data.subscriptions) || !Array.isArray(data.debts)) {
+      return {
+        success: false,
+        subscriptionsCount: 0,
+        debtsCount: 0,
+        creditsCount: 0,
+        spendingCount: 0,
+        error: 'Invalid backup file format',
+      };
+    }
+
     const credits = Array.isArray(data.credits) ? data.credits : [];
     const dailySpending = Array.isArray(data.dailySpending) ? data.dailySpending : [];
 

@@ -1,8 +1,8 @@
 import { useTheme } from '../../hooks/useTheme';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator,
+  ActivityIndicator, AppState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -12,34 +12,68 @@ import { AmbientBackground } from '../../components/AmbientBackground';
 import { GlassButton } from '../../components/GlassButton';
 import { AppPopup } from '../../components/AppPopup';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
+import { GlassInput } from '../../components/GlassInput';
 import { exportAllData } from '../../utils/exportData';
-import { pickAndImportData, clearAllData } from '../../utils/importData';
+import { pickAndImportData, clearAllData, importDataObj } from '../../utils/importData';
 import { useDebts } from '../../hooks/useDebts';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
 import { useCredits } from '../../hooks/useCredits';
 import { useDailySpending } from '../../hooks/useDailySpending';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useBudget } from '../../hooks/useBudget';
 import { storage } from '../../storage/mmkv';
 import { STORAGE_KEYS } from '../../storage/keys';
+import { hasBiometrics, toggleBiometricAuth } from '../../utils/authHelpers';
 import Constants from 'expo-constants';
 
 export default function SettingsModal() {
   const { colors, mode, setMode, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
+  
   const { refresh: refreshDebts } = useDebts();
   const { refresh: refreshSubs } = useSubscriptions();
   const { refresh: refreshCredits } = useCredits();
   const { refresh: refreshSpending } = useDailySpending();
   const { currency, setCurrency: setSelectedCurrency } = useCurrency();
+  const { budget, setBudget } = useBudget();
   
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [biometricsSupported, setBiometricsSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [budgetInput, setBudgetInput] = useState(budget.amount > 0 ? budget.amount.toString() : '');
 
   // Popup state
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupConfig, setPopupConfig] = useState<any>({});
+
+  useEffect(() => {
+    hasBiometrics().then(setBiometricsSupported);
+    storage.getString(STORAGE_KEYS.IS_BIOMETRIC_AUTH_ENABLED).then((val) => {
+      setBiometricEnabled(val === 'true');
+    });
+  }, []);
+
+  const handleSaveBudget = () => {
+    const amount = parseFloat(budgetInput);
+    if (!isNaN(amount)) {
+      setBudget(amount);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
+  const handleToggleBiometrics = async () => {
+    const newVal = !biometricEnabled;
+    const success = await toggleBiometricAuth(newVal);
+    if (success) {
+      setBiometricEnabled(newVal);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
 
   const showPopup = (config: any) => {
     setPopupConfig(config);
@@ -115,7 +149,7 @@ export default function SettingsModal() {
             iconColor: '#66BB6A',
             confirmText: 'Done',
             onConfirm: closePopup,
-          }), 400); // Wait for modal exit animation
+          }), 400);
         } else if (result.error !== 'User cancelled') {
           setTimeout(() => showPopup({
             title: 'Import Failed',
@@ -196,26 +230,64 @@ export default function SettingsModal() {
         <View style={{ width: 36 }} />
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
+        {/* Monthly Budget */}
+        <Text style={styles.sectionTitle}>MONTHLY BUDGET</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardDesc}>Set a monthly spending limit to track your progress.</Text>
+          <View style={styles.budgetInputRow}>
+            <View style={{ flex: 1 }}>
+              <GlassInput 
+                placeholder="0.00" 
+                value={budgetInput} 
+                onChangeText={setBudgetInput} 
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <TouchableOpacity 
+              style={styles.saveBudgetBtn} 
+              onPress={handleSaveBudget}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.saveBudgetBtnText}>Set</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Appearance Section */}
         <Text style={styles.sectionTitle}>APPEARANCE</Text>
         <View style={styles.card}>
           <Text style={styles.cardDesc}>Choose your preferred app theme.</Text>
           <View style={styles.themeRow}>
-            {['light', 'system', 'dark'].map((t) => (
+            {[
+              { id: 'light', icon: 'sunny-outline', label: 'Light' },
+              { id: 'system', icon: 'settings-outline', label: 'System' },
+              { id: 'dark', icon: 'moon-outline', label: 'Dark' },
+            ].map((t) => (
               <TouchableOpacity
-                key={t}
-                style={[styles.themeBtn, mode === t && styles.themeBtnActive]}
-                onPress={() => setMode(t as any)}
+                key={t.id}
+                style={[styles.themeBtn, mode === t.id && styles.themeBtnActive]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setMode(t.id as any);
+                }}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.themeBtnText, mode === t && styles.themeBtnTextActive]}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                <Ionicons 
+                  name={t.icon as any} 
+                  size={18} 
+                  color={mode === t.id ? colors.accent.blue : colors.text.muted} 
+                  style={{ marginBottom: 4 }}
+                />
+                <Text style={[styles.themeBtnText, mode === t.id && styles.themeBtnTextActive]}>
+                  {t.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Currency Section */}
+
+        {/* Currency */}
         <Text style={styles.sectionTitle}>CURRENCY</Text>
         <View style={styles.card}>
           <Text style={styles.cardDesc}>Select your default currency for displaying amounts.</Text>
@@ -238,6 +310,40 @@ export default function SettingsModal() {
           </TouchableOpacity>
         </View>
 
+        {/* Security Section */}
+        {biometricsSupported && (
+          <>
+            <Text style={styles.sectionTitle}>APP SECURITY</Text>
+            <View style={styles.card}>
+              <Text style={styles.cardDesc}>Protect your financial data with biometric authentication.</Text>
+              <TouchableOpacity
+                style={styles.securityRow}
+                onPress={handleToggleBiometrics}
+                activeOpacity={0.7}
+              >
+                <View style={styles.securityLeft}>
+                  <Ionicons 
+                    name={biometricEnabled ? "finger-print" : "finger-print-outline"} 
+                    size={22} 
+                    color={biometricEnabled ? colors.accent.blue : colors.text.muted} 
+                  />
+                  <Text style={styles.securityLabel}>Biometric Lock</Text>
+                </View>
+                <View style={[
+                  styles.toggleSwitch, 
+                  biometricEnabled && styles.toggleSwitchActive
+                ]}>
+                  <View style={[
+                    styles.toggleHandle,
+                    biometricEnabled && styles.toggleHandleActive
+                  ]} />
+                </View>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* Backup & Restore */}
         <Text style={styles.sectionTitle}>BACKUP & RESTORE</Text>
         <View style={styles.card}>
           <Text style={styles.cardDesc}>Export your data to a JSON file for backup or transfer.</Text>
@@ -372,6 +478,73 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontWeight: '700',
   },
 
+  // Security Row
+  securityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: isDark ? 'rgba(30, 30, 45, 0.8)' : colors.glass.card,
+    borderWidth: 0.5,
+    borderColor: colors.glass.cardBorder,
+    borderRadius: 14,
+    padding: 14,
+  },
+  securityLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  securityLabel: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  toggleSwitch: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleSwitchActive: {
+    backgroundColor: colors.accent.blue,
+  },
+  toggleHandle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleHandleActive: {
+    alignSelf: 'flex-end',
+  },
+
+  // Budget
+  budgetInputRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  saveBudgetBtn: {
+    height: 48,
+    paddingHorizontal: 20,
+    backgroundColor: colors.accent.blue,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveBudgetBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
   importRow: { flexDirection: 'row', gap: 12 },
   importBtn: { flex: 1, backgroundColor: isDark ? 'rgba(30, 30, 45, 0.8)' : colors.glass.card, borderWidth: 1, borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.glass.cardBorder, borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center' },
   importBtnDanger: { borderColor: 'rgba(239,83,80,0.2)' },
@@ -388,27 +561,35 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
 
   themeRow: {
     flexDirection: 'row',
-    backgroundColor: colors.glass.input,
-    borderRadius: 12,
+    backgroundColor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.03)',
+    borderRadius: 14,
     padding: 4,
     borderWidth: 1,
-    borderColor: colors.glass.inputBorder,
+    borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
   },
   themeBtn: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
+    justifyContent: 'center',
   },
   themeBtnActive: {
-    backgroundColor: colors.glass.cardBorder,
+    backgroundColor: isDark ? 'rgba(79, 195, 247, 0.15)' : '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0 : 0.05,
+    shadowRadius: 4,
+    elevation: isDark ? 0 : 2,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(79, 195, 247, 0.3)' : 'rgba(0, 0, 0, 0.05)',
   },
   themeBtnText: {
     color: colors.text.muted,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 12,
   },
   themeBtnTextActive: {
-    color: colors.text.primary,
+    color: colors.accent.blue,
   },
 });

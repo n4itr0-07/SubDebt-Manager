@@ -70,7 +70,7 @@ export const darkColors: ThemeColors = {
     inputBorderFocused: 'rgba(79,195,247,0.6)',
     buttonSecondary: 'rgba(255,255,255,0.08)',
     buttonSecondaryBorder: 'rgba(255,255,255,0.15)',
-    nav: 'rgba(255,255,255,0.08)',
+    nav: 'rgba(255,255,255,0.1)',
     navBorder: 'rgba(255,255,255,0.15)',
   },
   accent: {
@@ -88,7 +88,7 @@ export const darkColors: ThemeColors = {
     blue: '#1d4ed8',
   },
   text: {
-    primary: 'rgba(255,255,255,0.95)',
+    primary: '#ffffff',
     secondary: 'rgba(255,255,255,0.7)',
     tertiary: 'rgba(255,255,255,0.5)',
     muted: 'rgba(255,255,255,0.4)',
@@ -106,21 +106,21 @@ export const darkColors: ThemeColors = {
 
 export const lightColors: ThemeColors = {
   background: {
-    primary: '#f8fafc',
-    secondary: '#eff6ff',
-    mesh: ['#f8fafc', '#eff6ff', '#e0e7ff'],
+    primary: '#ffffff',
+    secondary: '#f1f5f9',
+    mesh: ['#ffffff', '#f1f5f9', '#e2e8f0'],
   },
   glass: {
-    card: 'rgba(255,255,255,0.95)',
-    cardBorder: 'rgba(255,255,255,1)',
-    cardTopBorder: 'rgba(255,255,255,1)',
-    input: 'rgba(255,255,255,0.8)',
-    inputBorder: 'rgba(0,0,0,0.1)',
+    card: '#ffffff',
+    cardBorder: 'rgba(0,0,0,0.06)',
+    cardTopBorder: 'rgba(0,0,0,0.02)',
+    input: 'rgba(0,0,0,0.03)',
+    inputBorder: 'rgba(0,0,0,0.08)',
     inputBorderFocused: 'rgba(2,132,199,0.5)',
-    buttonSecondary: 'rgba(255,255,255,0.7)',
-    buttonSecondaryBorder: 'rgba(0,0,0,0.1)',
-    nav: 'rgba(255,255,255,0.85)',
-    navBorder: 'rgba(0,0,0,0.1)',
+    buttonSecondary: 'rgba(0,0,0,0.05)',
+    buttonSecondaryBorder: 'rgba(0,0,0,0.08)',
+    nav: 'rgba(255,255,255,0.9)',
+    navBorder: 'rgba(0,0,0,0.08)',
   },
   accent: {
     blue: '#0284c7',
@@ -137,11 +137,11 @@ export const lightColors: ThemeColors = {
     blue: '#e0f2fe',
   },
   text: {
-    primary: 'rgba(0,0,0,0.85)',
-    secondary: 'rgba(0,0,0,0.65)',
-    tertiary: 'rgba(0,0,0,0.5)',
-    muted: 'rgba(0,0,0,0.4)',
-    placeholder: 'rgba(0,0,0,0.35)',
+    primary: '#0f172a',
+    secondary: '#475569',
+    tertiary: '#64748b',
+    muted: '#94a3b8',
+    placeholder: '#cbd5e1',
   },
   status: {
     active: { bg: 'rgba(22,163,74,0.1)', border: 'rgba(22,163,74,0.3)', text: '#16a34a' },
@@ -150,7 +150,7 @@ export const lightColors: ThemeColors = {
     paid: { bg: 'rgba(22,163,74,0.1)', border: 'rgba(22,163,74,0.3)', text: '#16a34a' },
   },
   badge: { glass: 'rgba(0,0,0,0.05)' },
-  shadows: { purpleGlow: 'rgba(124,58,237,0.3)', blueGlow: 'rgba(2,132,199,0.3)', amberGlow: 'rgba(245,158,11,0.3)' },
+  shadows: { purpleGlow: 'rgba(124,58,237,0.2)', blueGlow: 'rgba(2,132,199,0.2)', amberGlow: 'rgba(245,158,11,0.2)' },
 };
 
 // Default export for legacy support (temporarily keeps current imports from breaking completely while we refactor)

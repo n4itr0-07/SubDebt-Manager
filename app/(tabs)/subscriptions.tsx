@@ -48,7 +48,7 @@ export default function SubscriptionsScreen() {
   const styles = getStyles(colors);
   const router = useRouter();
   const { subscriptions, isLoaded, deleteSubscription, getTotalAmount, refresh } = useSubscriptions();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, convertAmount, refresh: refreshCurrency } = useCurrency();
   const [filter, setFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -101,12 +101,12 @@ export default function SubscriptionsScreen() {
         data,
         icon: CATEGORY_ICONS[title] || 'apps-outline',
         count: data.length,
-        total: data.reduce((sum, s) => sum + s.amount, 0),
+        total: data.reduce((sum, s) => sum + convertAmount(s.amount, s.currency), 0),
       }))
       .sort((a, b) => b.total - a.total);
-  }, [filteredSubscriptions, groupByCategory]);
+  }, [filteredSubscriptions, groupByCategory, convertAmount]);
 
-  const totalAmount = getTotalAmount();
+  const totalAmount = getTotalAmount(convertAmount);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -117,7 +117,8 @@ export default function SubscriptionsScreen() {
   useFocusEffect(
     useCallback(() => {
       refresh();
-    }, [refresh])
+      refreshCurrency();
+    }, [refresh, refreshCurrency])
   );
 
   const handleAddPress = () => {
