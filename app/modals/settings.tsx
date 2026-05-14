@@ -13,7 +13,9 @@ import { GlassButton } from '../../components/GlassButton';
 import { AppPopup } from '../../components/AppPopup';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
 import { GlassInput } from '../../components/GlassInput';
+import { UpdatePrompt } from '../../components/UpdatePrompt';
 import { exportAllData } from '../../utils/exportData';
+import { checkForUpdate, UpdateInfo } from '../../utils/updateChecker';
 import { pickAndImportData, clearAllData, importDataObj } from '../../utils/importData';
 import { useDebts } from '../../hooks/useDebts';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
@@ -44,6 +46,10 @@ export default function SettingsModal() {
   const [biometricsSupported, setBiometricsSupported] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [budgetInput, setBudgetInput] = useState(budget.amount > 0 ? budget.amount.toString() : '');
+
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
 
   // Popup state
   const [popupVisible, setPopupVisible] = useState(false);
@@ -81,6 +87,37 @@ export default function SettingsModal() {
   };
 
   const closePopup = () => setPopupVisible(false);
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    try {
+      const info = await checkForUpdate(true);
+      if (info?.available) {
+        setUpdateInfo(info);
+        setShowUpdatePrompt(true);
+      } else {
+        showPopup({
+          title: 'Up to date',
+          message: 'You are already running the latest version of SubDebt.',
+          icon: 'checkmark-circle-outline',
+          iconColor: '#66BB6A',
+          confirmText: 'Great',
+          onConfirm: closePopup,
+        });
+      }
+    } catch {
+      showPopup({
+        title: 'Update Check Failed',
+        message: 'Could not connect to GitHub to check for updates.',
+        icon: 'warning-outline',
+        iconColor: colors.accent.red,
+        confirmText: 'Dismiss',
+        onConfirm: closePopup,
+      });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   const handleExport = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -398,7 +435,18 @@ export default function SettingsModal() {
         <Text style={styles.sectionTitle}>ABOUT</Text>
         <View style={styles.card}>
           <View style={styles.aboutRow}><Text style={styles.aboutLabel}>App</Text><Text style={styles.aboutValue}>SubDebt</Text></View>
-          <View style={styles.aboutRow}><Text style={styles.aboutLabel}>Version</Text><Text style={styles.aboutValue}>{Constants.expoConfig?.version || '1.0.0'}</Text></View>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Version</Text>
+            <Text style={styles.aboutValue}>{Constants.expoConfig?.version || '1.0.0'}</Text>
+          </View>
+          <TouchableOpacity style={styles.aboutRow} onPress={handleCheckUpdate} disabled={checkingUpdate}>
+            <Text style={[styles.aboutLabel, { color: colors.accent.blue }]}>Check for Updates</Text>
+            {checkingUpdate ? (
+              <ActivityIndicator size="small" color={colors.accent.blue} />
+            ) : (
+              <Ionicons name="cloud-download-outline" size={18} color={colors.accent.blue} />
+            )}
+          </TouchableOpacity>
           <View style={styles.aboutRow}><Text style={styles.aboutLabel}>Storage</Text><Text style={styles.aboutValue}>Local Device</Text></View>
           <View style={[styles.aboutRow, { borderBottomWidth: 0 }]}><Text style={styles.aboutLabel}>Currency</Text><Text style={styles.aboutValue}>{currency.symbol} {currency.code}</Text></View>
         </View>
@@ -411,6 +459,14 @@ export default function SettingsModal() {
         onSelect={handleCurrencySelect}
         onClose={() => setShowCurrencyPicker(false)}
       />
+
+      {updateInfo && (
+        <UpdatePrompt
+          visible={showUpdatePrompt}
+          updateInfo={updateInfo}
+          onDismiss={() => setShowUpdatePrompt(false)}
+        />
+      )}
 
       <AppPopup 
         visible={popupVisible}

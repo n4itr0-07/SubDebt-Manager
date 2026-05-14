@@ -1,6 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { Platform } from 'react-native';
 import { storage } from '../storage/mmkv';
 import { STORAGE_KEYS } from '../storage/keys';
 
@@ -34,25 +33,7 @@ export const exportAllData = async (): Promise<boolean> => {
     const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '');
     const fileName = `SubDebt_Backup_${dateStr}_${timeStr}.json`;
 
-    if (Platform.OS === 'android') {
-      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-      if (permissions.granted) {
-        const uri = await FileSystem.StorageAccessFramework.createFileAsync(
-          permissions.directoryUri,
-          fileName,
-          'application/json'
-        );
-        await FileSystem.writeAsStringAsync(
-          uri,
-          JSON.stringify(exportData, null, 2)
-        );
-        return true;
-      }
-      return false; // User cancelled
-    }
-
-    // iOS fallback
-    const filePath = `${FileSystem.documentDirectory}${fileName}`;
+    const filePath = `${FileSystem.cacheDirectory}${fileName}`;
     await FileSystem.writeAsStringAsync(
       filePath,
       JSON.stringify(exportData, null, 2)

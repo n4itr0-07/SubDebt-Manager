@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Redirect, useRouter } from 'expo-router';
+import { useEffect, useState, useRef } from 'react';
+import { Redirect } from 'expo-router';
 import { View } from 'react-native';
 import { storage } from '../storage/mmkv';
 import { STORAGE_KEYS } from '../storage/keys';
@@ -7,25 +7,25 @@ import { useTheme } from '../hooks/useTheme';
 
 export default function Index() {
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
+  const hasResolved = useRef(false);
   const { colors } = useTheme();
 
   useEffect(() => {
-    async function checkOnboarding() {
-      try {
-        const hasSeen = await storage.getString(STORAGE_KEYS.HAS_SEEN_ONBOARDING);
-        if (hasSeen === 'true') {
-          setInitialRoute('/(tabs)/subscriptions');
-        } else {
-          setInitialRoute('/onboarding');
-        }
-      } catch {
-        setInitialRoute('/onboarding');
-      }
-    }
-    checkOnboarding();
+    if (hasResolved.current) return;
+    hasResolved.current = true;
+
+    storage.getString(STORAGE_KEYS.HAS_SEEN_ONBOARDING)
+      .then(hasSeen => {
+        setInitialRoute(hasSeen === 'true' ? '/(tabs)/home' : '/onboarding');
+      })
+      .catch(() => {
+        setInitialRoute('/(tabs)/home');
+      });
   }, []);
 
-  if (!initialRoute) return <View style={{ flex: 1, backgroundColor: colors.background.primary }} />;
+  if (!initialRoute) {
+    return <View style={{ flex: 1, backgroundColor: colors.background.primary }} />;
+  }
 
   return <Redirect href={initialRoute as any} />;
 }

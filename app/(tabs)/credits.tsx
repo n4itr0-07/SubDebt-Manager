@@ -1,6 +1,6 @@
 import { useTheme } from '../../hooks/useTheme';
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +13,7 @@ import { AppPopup } from '../../components/AppPopup';
 import { SearchBar } from '../../components/SearchBar';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { Confetti } from '../../components/Confetti';
+import { SortFilterSheet, SortOption } from '../../components/SortFilterSheet';
 import { useCredits, Credit } from '../../hooks/useCredits';
 import { useCurrency } from '../../hooks/useCurrency';
 import { formatCurrency } from '../../utils/dateHelpers';
@@ -21,6 +22,14 @@ const filterOptions = [
   { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
   { key: 'returned', label: 'Returned' },
+];
+
+const sortOptions: SortOption[] = [
+  { id: 'date_desc', label: 'Newest First', icon: 'time-outline' },
+  { id: 'date_asc', label: 'Oldest First', icon: 'time-outline' },
+  { id: 'amount_desc', label: 'Amount: High to Low', icon: 'trending-down-outline' },
+  { id: 'amount_asc', label: 'Amount: Low to High', icon: 'trending-up-outline' },
+  { id: 'name_asc', label: 'Name: A to Z', icon: 'text-outline' },
 ];
 
 export default function CreditsScreen() {
@@ -34,6 +43,9 @@ export default function CreditsScreen() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
+  
+  const [showSortSheet, setShowSortSheet] = useState(false);
+  const [sortBy, setSortBy] = useState('date_desc');
 
   const filteredCredits = useMemo(() => {
     let result = credits;
@@ -51,8 +63,21 @@ export default function CreditsScreen() {
       );
     }
 
+    // Apply Sort
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'amount_desc': return b.amount - a.amount;
+        case 'amount_asc': return a.amount - b.amount;
+        case 'name_asc': return a.personName.localeCompare(b.personName);
+        case 'date_asc': return new Date(a.lentDate).getTime() - new Date(b.lentDate).getTime();
+        case 'date_desc':
+        default:
+          return new Date(b.lentDate).getTime() - new Date(a.lentDate).getTime();
+      }
+    });
+
     return result;
-  }, [credits, filter, searchQuery]);
+  }, [credits, filter, searchQuery, sortBy]);
 
   const totalPending = getTotalPendingAmount(convertAmount);
 
@@ -129,16 +154,29 @@ export default function CreditsScreen() {
         accentColor={colors.accent.green}
       />
 
+      {/* Filter Pills & Sort Button */}
       <View style={styles.filterRow}>
-        {filterOptions.map((opt) => (
-          <TouchableOpacity
-            key={opt.key}
-            style={[styles.filterPill, filter === opt.key && styles.filterPillActive]}
-            onPress={() => setFilter(opt.key)}
-          >
-            <Text style={[styles.filterText, filter === opt.key && styles.filterTextActive]}>{opt.label}</Text>
-          </TouchableOpacity>
-        ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {filterOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.filterPill, filter === opt.key && styles.filterPillActive]}
+              onPress={() => setFilter(opt.key)}
+            >
+              <Text style={[styles.filterText, filter === opt.key && styles.filterTextActive]}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <TouchableOpacity 
+          style={styles.sortBtn} 
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowSortSheet(true);
+          }}
+        >
+          <Ionicons name="swap-vertical" size={18} color={colors.text.secondary} />
+          <Text style={styles.sortBtnText}>Sort</Text>
+        </TouchableOpacity>
       </View>
     </>
   );
@@ -231,6 +269,15 @@ export default function CreditsScreen() {
         onCancel={() => setDeleteId(null)}
         onConfirm={confirmDelete}
       />
+
+      <SortFilterSheet
+        visible={showSortSheet}
+        onClose={() => setShowSortSheet(false)}
+        title="Sort Credits"
+        options={sortOptions}
+        selectedOptionId={sortBy}
+        onSelect={setSortBy}
+      />
     </SafeAreaView>
   );
 }
@@ -253,6 +300,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   filterPillActive: { backgroundColor: 'rgba(102,187,106,0.15)', borderColor: 'rgba(102,187,106,0.4)' },
   filterText: { color: colors.text.muted, fontSize: 13, fontWeight: '500' },
   filterTextActive: { color: colors.accent.green, fontWeight: '600' },
+  filterScroll: { gap: 8 },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: colors.glass.card, borderWidth: 0.5, borderColor: colors.glass.buttonSecondary, marginLeft: 12 },
+  sortBtnText: { color: colors.text.secondary, fontSize: 13, fontWeight: '600' },
   listContent: { paddingTop: 4, paddingBottom: 120 },
   noResultsWrap: { alignItems: 'center', paddingTop: 40, gap: 12 },
   noResultsText: { color: colors.text.muted, fontSize: 15 },

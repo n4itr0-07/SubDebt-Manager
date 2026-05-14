@@ -1,7 +1,7 @@
 import { useTheme } from '../../hooks/useTheme';
 import React, { useState, useMemo, useCallback } from 'react';
 import { 
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView, Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DebtCard } from '../../components/DebtCard';
+import { CreditCard } from '../../components/CreditCard';
 import { EmptyState } from '../../components/EmptyState';
 import { SwipeableRow } from '../../components/SwipeableRow';
 import { AmbientBackground } from '../../components/AmbientBackground';
@@ -18,9 +19,9 @@ import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { Confetti } from '../../components/Confetti';
 import { SortFilterSheet, SortOption } from '../../components/SortFilterSheet';
 import { useDebts, Debt } from '../../hooks/useDebts';
+import { useCredits, Credit } from '../../hooks/useCredits';
 import { useCurrency } from '../../hooks/useCurrency';
 import { formatCurrency } from '../../utils/dateHelpers';
-import { typography, spacing } from '../../constants/typography';
 
 const filterOptions = [
   { key: 'all', label: 'All' },
@@ -36,32 +37,44 @@ const sortOptions: SortOption[] = [
   { id: 'name_asc', label: 'Name: A to Z', icon: 'text-outline' },
 ];
 
-export default function DebtsScreen() {
-  const { colors } = useTheme();
-  const styles = getStyles(colors);
+export default function OwedScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
-  const { debts, isLoaded, deleteDebt, markDebtAsPaid, getTotalPendingAmount, refresh } = useDebts();
+  
+  // View mode: 'borrowed' (Debts) or 'lent' (Credits)
+  const [viewMode, setViewMode] = useState<'borrowed' | 'lent'>('borrowed');
+
+  const { debts, isLoaded: debtsLoaded, deleteDebt, markDebtAsPaid, getTotalPendingAmount: getDebtPending, refresh: refreshDebts } = useDebts();
+  const { credits, isLoaded: creditsLoaded, deleteCredit, markCreditAsReturned, getTotalPendingAmount: getCreditPending, refresh: refreshCredits } = useCredits();
   const { currencyCode, convertAmount, refresh: refreshCurrency } = useCurrency();
+
+  const isLoaded = debtsLoaded && creditsLoaded;
   const [filter, setFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
-  
   const [showSortSheet, setShowSortSheet] = useState(false);
   const [sortBy, setSortBy] = useState('date_desc');
 
-  const filteredDebts = useMemo(() => {
-    let result = debts;
+  const data = viewMode === 'borrowed' ? debts : credits;
+  const accentColor = viewMode === 'borrowed' ? colors.accent.amber : colors.accent.blue;
+
+  const filteredData = useMemo(() => {
+    let result = [...data];
 
     // Apply filter
-    if (filter === 'pending') result = result.filter(d => !d.isPaid);
-    else if (filter === 'paid') result = result.filter(d => d.isPaid);
+    if (filter === 'pending') {
+      result = result.filter((d: any) => viewMode === 'borrowed' ? !d.isPaid : !d.isReturned);
+    } else if (filter === 'paid') {
+      result = result.filter((d: any) => viewMode === 'borrowed' ? d.isPaid : d.isReturned);
+    }
 
     // Apply search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      result = result.filter(d =>
+      result = result.filter((d: any) =>
         d.personName.toLowerCase().includes(q) ||
         (d.purpose && d.purpose.toLowerCase().includes(q)) ||
         (d.notes && d.notes.toLowerCase().includes(q)) ||
@@ -70,52 +83,62 @@ export default function DebtsScreen() {
     }
 
     // Apply Sort
-    result.sort((a, b) => {
+    result.sort((a: any, b: any) => {
       switch (sortBy) {
         case 'amount_desc': return b.amount - a.amount;
         case 'amount_asc': return a.amount - b.amount;
         case 'name_asc': return a.personName.localeCompare(b.personName);
-        case 'date_asc': return new Date(a.takenDate).getTime() - new Date(b.takenDate).getTime();
+        case 'date_asc': {
+            const dateA = new Date(a.takenDate || a.lentDate).getTime();
+            const dateB = new Date(b.takenDate || b.lentDate).getTime();
+            return dateA - dateB;
+        }
         case 'date_desc':
-        default:
-          return new Date(b.takenDate).getTime() - new Date(a.takenDate).getTime();
+        default: {
+            const dateA = new Date(a.takenDate || a.lentDate).getTime();
+            const dateB = new Date(b.takenDate || b.lentDate).getTime();
+            return dateB - dateA;
+        }
       }
     });
 
     return result;
-  }, [debts, filter, searchQuery, sortBy]);
+  }, [data, filter, searchQuery, sortBy, viewMode]);
 
-  const totalPending = getTotalPendingAmount(convertAmount);
+  const totalPending = viewMode === 'borrowed' 
+    ? getDebtPending(convertAmount) 
+    : getCreditPending(convertAmount);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refresh();
+    await Promise.all([refreshDebts(), refreshCredits(), refreshCurrency()]);
     setRefreshing(false);
-  }, [refresh]);
+  }, [refreshDebts, refreshCredits, refreshCurrency]);
 
   useFocusEffect(
     useCallback(() => {
-      refresh();
+      refreshDebts();
+      refreshCredits();
       refreshCurrency();
-    }, [refresh, refreshCurrency])
+    }, [refreshDebts, refreshCredits, refreshCurrency])
   );
 
   const handleAddPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/modals/add-debt');
+    router.push(viewMode === 'borrowed' ? '/modals/add-debt' : '/modals/add-credit');
   };
 
   const handleTogglePaid = (id: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    markDebtAsPaid(id);
-    // Trigger confetti celebration
+    if (viewMode === 'borrowed') markDebtAsPaid(id);
+    else markCreditAsReturned(id);
     setShowConfetti(true);
   };
 
-  const handleEdit = (debt: Debt) => {
+  const handleEdit = (item: any) => {
     router.push({
-      pathname: '/modals/edit-debt',
-      params: { id: debt.id },
+      pathname: viewMode === 'borrowed' ? '/modals/edit-debt' : '/modals/edit-credit',
+      params: { id: item.id },
     });
   };
 
@@ -126,38 +149,72 @@ export default function DebtsScreen() {
 
   const confirmDelete = () => {
     if (deleteId) {
-      deleteDebt(deleteId);
+      if (viewMode === 'borrowed') deleteDebt(deleteId);
+      else deleteCredit(deleteId);
       setDeleteId(null);
     }
   };
 
-  const renderItem = ({ item }: { item: Debt }) => (
+  const renderItem = ({ item }: { item: any }) => (
     <SwipeableRow
       onEdit={() => handleEdit(item)}
       onDelete={() => handleDelete(item.id)}
     >
-      <DebtCard 
-        debt={item} 
-        onTogglePaid={handleTogglePaid}
-        onPress={() => handleEdit(item)}
-        onDelete={() => handleDelete(item.id)}
-      />
+      {viewMode === 'borrowed' ? (
+        <DebtCard 
+          debt={item} 
+          onTogglePaid={handleTogglePaid}
+          onPress={() => handleEdit(item)}
+          onDelete={() => handleDelete(item.id)}
+        />
+      ) : (
+        <CreditCard 
+          credit={item} 
+          onMarkReturned={handleTogglePaid}
+          onPress={() => handleEdit(item)}
+          onDelete={() => handleDelete(item.id)}
+        />
+      )}
     </SwipeableRow>
   );
 
   const renderHeader = () => (
     <>
+      {/* Segmented Control */}
+      <View style={styles.segmentedWrapper}>
+        <TouchableOpacity 
+          style={[styles.segment, viewMode === 'borrowed' && styles.segmentActiveBorrowed]} 
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setViewMode('borrowed');
+          }}
+        >
+          <Ionicons name="arrow-down-circle" size={18} color={viewMode === 'borrowed' ? '#fff' : colors.text.tertiary} />
+          <Text style={[styles.segmentText, viewMode === 'borrowed' && styles.segmentTextActive]}>Borrowed</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.segment, viewMode === 'lent' && styles.segmentActiveLent]} 
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setViewMode('lent');
+          }}
+        >
+          <Ionicons name="arrow-up-circle" size={18} color={viewMode === 'lent' ? '#fff' : colors.text.tertiary} />
+          <Text style={[styles.segmentText, viewMode === 'lent' && styles.segmentTextActive]}>Lent</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Summary Card */}
-      <View style={styles.summaryCard}>
+      <View style={[styles.summaryCard, { borderColor: viewMode === 'borrowed' ? 'rgba(255,183,77,0.2)' : 'rgba(79,195,247,0.2)' }]}>
         <View style={styles.summaryTop}>
-          <Text style={styles.summaryLabel}>Total Pending</Text>
-          <View style={styles.pendingBadge}>
-            <Text style={styles.pendingBadgeText}>
-              {debts.filter(d => !d.isPaid).length} pending
+          <Text style={styles.summaryLabel}>{viewMode === 'borrowed' ? 'Total to Pay' : 'Total to Collect'}</Text>
+          <View style={[styles.pendingBadge, { backgroundColor: viewMode === 'borrowed' ? 'rgba(255,183,77,0.1)' : 'rgba(79,195,247,0.1)' }]}>
+            <Text style={[styles.pendingBadgeText, { color: accentColor }]}>
+              {data.filter((d: any) => viewMode === 'borrowed' ? !d.isPaid : !d.isReturned).length} pending
             </Text>
           </View>
         </View>
-        <Text style={styles.summaryAmount}>
+        <Text style={[styles.summaryAmount, { color: accentColor }]}>
           {formatCurrency(totalPending, currencyCode)}
         </Text>
       </View>
@@ -166,20 +223,20 @@ export default function DebtsScreen() {
       <SearchBar
         value={searchQuery}
         onChangeText={setSearchQuery}
-        placeholder="Search debts..."
-        accentColor={colors.accent.amber}
+        placeholder={`Search ${viewMode}...`}
+        accentColor={accentColor}
       />
 
-      {/* Filter Pills & Sort Button */}
+      {/* Filter & Sort */}
       <View style={styles.filterRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
           {filterOptions.map((opt) => (
             <TouchableOpacity
               key={opt.key}
-              style={[styles.filterPill, filter === opt.key && styles.filterPillActive]}
+              style={[styles.filterPill, filter === opt.key && { backgroundColor: `${accentColor}15`, borderColor: `${accentColor}40` }]}
               onPress={() => setFilter(opt.key)}
             >
-              <Text style={[styles.filterText, filter === opt.key && styles.filterTextActive]}>
+              <Text style={[styles.filterText, filter === opt.key && { color: accentColor, fontWeight: '700' }]}>
                 {opt.label}
               </Text>
             </TouchableOpacity>
@@ -199,21 +256,12 @@ export default function DebtsScreen() {
     </>
   );
 
-  // Skeleton Loading
   if (!isLoaded) {
     return (
       <SafeAreaView style={styles.container}>
         <AmbientBackground />
         <View style={styles.header}>
-          <Text style={styles.title}>Debts</Text>
-          <View style={styles.headerRight}>
-            <View style={styles.addButton}>
-              <Ionicons name="add" size={22} color={colors.accent.amber} />
-            </View>
-            <View style={styles.iconButton}>
-              <Ionicons name="settings-outline" size={22} color={colors.text.tertiary} />
-            </View>
-          </View>
+          <Text style={styles.title}>Manager</Text>
         </View>
         <SkeletonLoader variant="debts" />
       </SafeAreaView>
@@ -223,19 +271,13 @@ export default function DebtsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <AmbientBackground />
+      <Confetti visible={showConfetti} onComplete={() => setShowConfetti(false)} />
       
-      {/* Confetti overlay */}
-      <Confetti
-        visible={showConfetti}
-        onComplete={() => setShowConfetti(false)}
-      />
-      
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Debts</Text>
+        <Text style={styles.title}>Ledger</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddPress}>
-            <Ionicons name="add" size={22} color={colors.accent.amber} />
+          <TouchableOpacity style={[styles.addButton, { backgroundColor: `${accentColor}15` }]} onPress={handleAddPress}>
+            <Ionicons name="add" size={22} color={accentColor} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/modals/settings')}>
             <Ionicons name="settings-outline" size={22} color={colors.text.tertiary} />
@@ -243,22 +285,21 @@ export default function DebtsScreen() {
         </View>
       </View>
 
-      {/* List */}
-      {filteredDebts.length === 0 && !searchQuery ? (
+      {filteredData.length === 0 && !searchQuery ? (
         <>
           {renderHeader()}
           <EmptyState
-            icon="wallet-outline"
-            title="No debts recorded"
-            subtitle="Track money you owe to people"
-            actionLabel="Add Debt"
+            icon={viewMode === 'borrowed' ? "wallet-outline" : "cash-outline"}
+            title={`No ${viewMode} recorded`}
+            subtitle={viewMode === 'borrowed' ? "Track money you owe to people" : "Track money people owe you"}
+            actionLabel={`Add ${viewMode === 'borrowed' ? 'Debt' : 'Credit'}`}
             onAction={handleAddPress}
-            variant="debts"
+            variant={viewMode === 'borrowed' ? "debts" : "credits"}
           />
         </>
       ) : (
         <FlatList
-          data={filteredDebts}
+          data={filteredData}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={renderHeader}
@@ -267,9 +308,7 @@ export default function DebtsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.accent.amber}
-              colors={[colors.accent.amber]}
-              progressBackgroundColor="#1a1a2e"
+              tintColor={accentColor}
             />
           }
           ListEmptyComponent={
@@ -285,8 +324,8 @@ export default function DebtsScreen() {
 
       <AppPopup 
         visible={!!deleteId}
-        title="Delete Debt"
-        message="Are you sure you want to permanently delete this debt? This will clean it from storage."
+        title={`Delete ${viewMode === 'borrowed' ? 'Debt' : 'Credit'}`}
+        message="Are you sure you want to permanently delete this? Action cannot be undone."
         icon="trash-outline"
         iconColor={colors.accent.red}
         cancelText="Cancel"
@@ -299,7 +338,7 @@ export default function DebtsScreen() {
       <SortFilterSheet
         visible={showSortSheet}
         onClose={() => setShowSortSheet(false)}
-        title="Sort Debts"
+        title="Sort Results"
         options={sortOptions}
         selectedOptionId={sortBy}
         onSelect={setSortBy}
@@ -308,7 +347,7 @@ export default function DebtsScreen() {
   );
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.primary,
@@ -336,9 +375,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,183,77,0.12)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,183,77,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -350,15 +386,47 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  summaryCard: {
+  segmentedWrapper: {
+    flexDirection: 'row',
+    backgroundColor: colors.glass.card,
+    padding: 4,
+    borderRadius: 16,
     marginHorizontal: 20,
     marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 0.5,
+    borderColor: colors.glass.cardBorder,
+  },
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  segmentActiveBorrowed: {
+    backgroundColor: colors.accent.amber,
+  },
+  segmentActiveLent: {
+    backgroundColor: colors.accent.blue,
+  },
+  segmentText: {
+    color: colors.text.tertiary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  segmentTextActive: {
+    color: '#fff',
+  },
+  summaryCard: {
+    marginHorizontal: 20,
     marginBottom: 12,
     padding: 20,
     borderRadius: 20,
     backgroundColor: colors.glass.card,
-    borderWidth: 0.5,
-    borderColor: colors.glass.cardBorder,
+    borderWidth: 1,
   },
   summaryTop: {
     flexDirection: 'row',
@@ -377,17 +445,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,183,77,0.15)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,183,77,0.3)',
   },
   pendingBadgeText: {
-    color: '#FFB74D',
     fontSize: 11,
     fontWeight: '600',
   },
   summaryAmount: {
-    color: colors.text.primary,
     fontSize: 34,
     fontWeight: '700',
     letterSpacing: -1,
@@ -406,18 +469,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderWidth: 0.5,
     borderColor: colors.glass.buttonSecondary,
   },
-  filterPillActive: {
-    backgroundColor: 'rgba(255,183,77,0.15)',
-    borderColor: 'rgba(255,183,77,0.4)',
-  },
   filterText: {
     color: colors.text.muted,
     fontSize: 13,
     fontWeight: '500',
-  },
-  filterTextActive: {
-    color: colors.accent.amber,
-    fontWeight: '600',
   },
   filterScroll: {
     gap: 8,

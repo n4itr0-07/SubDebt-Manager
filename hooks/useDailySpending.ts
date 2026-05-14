@@ -462,6 +462,91 @@ export const useDailySpending = () => {
     return { date: maxKey, total: maxTotal };
   }, [getEntriesForRange]);
 
+  const getEntriesGroupedByDay = useCallback((range: TimeRange, convertFn?: ConvertFn): {
+    date: string;
+    label: string;
+    relativeLabel: string;
+    entries: SpendingEntry[];
+    total: number;
+  }[] => {
+    const filtered = getEntriesForRange(range);
+    const groups = new Map<string, SpendingEntry[]>();
+
+    filtered.forEach((entry) => {
+      const key = getEntryDayKey(entry.spentAt);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(entry);
+    });
+
+    const today = getDayKey(new Date());
+    const yesterday = getDayKey(addDays(new Date(), -1));
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, dayEntries]) => {
+        const d = new Date(date + 'T00:00:00');
+        const label = d.toLocaleDateString('en-IN', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        });
+        let relativeLabel = label;
+        if (date === today) relativeLabel = 'Today';
+        else if (date === yesterday) relativeLabel = 'Yesterday';
+
+        const total = dayEntries.reduce(
+          (sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount),
+          0
+        );
+
+        return { date, label, relativeLabel, entries: dayEntries, total };
+      });
+  }, [getEntriesForRange]);
+
+  const getSpendingHeatmap = useCallback((days: number = 30, convertFn?: ConvertFn): {
+    date: string;
+    total: number;
+    intensity: number;
+  }[] => {
+    const today = new Date();
+    const result: { date: string; total: number; intensity: number }[] = [];
+    let maxTotal = 0;
+
+    const dailyTotals: { date: string; total: number }[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const day = addDays(today, -i);
+      const dayEntries = getEntriesForDay(day);
+      const total = dayEntries.reduce(
+        (sum, e) => sum + (convertFn ? convertFn(e.amount, e.currency) : e.amount),
+        0
+      );
+      if (total > maxTotal) maxTotal = total;
+      dailyTotals.push({ date: getDayKey(day), total });
+    }
+
+    dailyTotals.forEach(({ date, total }) => {
+      const intensity = maxTotal > 0 ? total / maxTotal : 0;
+      result.push({ date, total, intensity });
+    });
+
+    return result;
+  }, [getEntriesForDay]);
+
+  const getTopExpenses = useCallback((range: TimeRange, limit: number = 5, convertFn?: ConvertFn) => {
+    const filtered = getEntriesForRange(range);
+    return [...filtered]
+      .sort((a, b) => {
+        const aVal = convertFn ? convertFn(a.amount, a.currency) : a.amount;
+        const bVal = convertFn ? convertFn(b.amount, b.currency) : b.amount;
+        return bVal - aVal;
+      })
+      .slice(0, limit);
+  }, [getEntriesForRange]);
+
+  const getEntryCount = useCallback((range: TimeRange) => {
+    return getEntriesForRange(range).length;
+  }, [getEntriesForRange]);
+
   return {
     entries,
     isLoaded,
@@ -486,6 +571,10 @@ export const useDailySpending = () => {
     getCategoryTotals,
     getComparisonStats,
     getHighestSpendingDay,
+    getEntriesGroupedByDay,
+    getSpendingHeatmap,
+    getTopExpenses,
+    getEntryCount,
     refresh: loadEntries,
   };
 };

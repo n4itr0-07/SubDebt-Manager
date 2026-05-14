@@ -11,7 +11,7 @@ interface EmptyStateProps {
   subtitle: string;
   actionLabel?: string;
   onAction?: () => void;
-  variant?: 'subscriptions' | 'debts';
+  variant?: 'subscriptions' | 'debts' | 'credits';
 }
 
 // Animated SVG illustration for subscriptions
@@ -165,7 +165,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <View style={styles.container}>
       {/* Animated Illustration */}
-      {variant === 'debts' ? <DebtIllustration /> : <SubscriptionIllustration />}
+      {variant === 'debts' || variant === 'credits' ? <DebtIllustration /> : <SubscriptionIllustration />}
 
       {/* Text content with fade-in */}
       <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideUp }], alignItems: 'center' }}>

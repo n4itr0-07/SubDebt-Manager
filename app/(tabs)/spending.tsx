@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpendingEntryCard } from '../../components/SpendingEntryCard';
 import { SpendingTrendChart } from '../../components/SpendingTrendChart';
 import { CategoryBreakdown } from '../../components/CategoryBreakdown';
+import { SpendingHeatmap } from '../../components/SpendingHeatmap';
+import { InsightsPanel } from '../../components/InsightsPanel';
 import { EmptyState } from '../../components/EmptyState';
 import { SwipeableRow } from '../../components/SwipeableRow';
 import { AmbientBackground } from '../../components/AmbientBackground';
@@ -55,6 +57,8 @@ export default function SpendingScreen() {
     getTotalForYear,
     getTotalForRange,
     getDailyAverage,
+    getNoSpendDaysThisMonth,
+    getSavingMessage,
     getWeeklyData,
     getDailyData,
     getYearlyMonthlyData,
@@ -62,6 +66,9 @@ export default function SpendingScreen() {
     getComparisonStats,
     getHighestSpendingDay,
     getEntriesForRange,
+    getEntriesGroupedByDay,
+    getSpendingHeatmap,
+    getTopExpenses,
     refresh,
   } = useDailySpending();
   const { budget } = useBudget();
@@ -100,6 +107,24 @@ export default function SpendingScreen() {
     () => getEntriesForRange(timeRange),
     [getEntriesForRange, timeRange]
   );
+
+  const groupedEntries = useMemo(
+    () => getEntriesGroupedByDay(timeRange, convertAmount),
+    [getEntriesGroupedByDay, timeRange, convertAmount]
+  );
+
+  const heatmapData = useMemo(
+    () => getSpendingHeatmap(30, convertAmount),
+    [getSpendingHeatmap, convertAmount]
+  );
+
+  const topExpenses = useMemo(
+    () => getTopExpenses(timeRange, 5, convertAmount),
+    [getTopExpenses, timeRange, convertAmount]
+  );
+
+  const noSpendDays = getNoSpendDaysThisMonth();
+  const savingMessage = getSavingMessage();
 
   const filteredEntries = useMemo(() => {
     const source = viewMode === 'entries' ? rangeEntries : rangeEntries;
@@ -318,8 +343,27 @@ export default function SpendingScreen() {
         rangeLabel={rangeLabel}
       />
 
-      {/* Section header for entries */}
+      {/* Spending Heatmap */}
+      <SpendingHeatmap
+        data={heatmapData}
+        currencyCode={currencyCode}
+      />
+
+      {/* Smart Insights */}
       {rangeEntries.length > 0 && (
+        <InsightsPanel
+          noSpendDaysMonth={noSpendDays}
+          savingMessage={savingMessage}
+          dailyAvg={dailyAvg}
+          topExpenses={topExpenses}
+          currencyCode={currencyCode}
+          budgetAmount={budget.amount}
+          monthTotal={monthTotal}
+        />
+      )}
+
+      {/* Day-grouped entries */}
+      {groupedEntries.length > 0 && (
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Entries</Text>
           <Text style={styles.sectionCount}>
@@ -327,6 +371,15 @@ export default function SpendingScreen() {
           </Text>
         </View>
       )}
+
+      {groupedEntries.slice(0, 5).map((group) => (
+        <View key={group.date}>
+          <View style={styles.dayHeader}>
+            <Text style={styles.dayLabel}>{group.relativeLabel}</Text>
+            <Text style={styles.dayTotal}>{formatCurrency(group.total, currencyCode)}</Text>
+          </View>
+        </View>
+      ))}
     </>
   );
 
@@ -860,5 +913,24 @@ const getStyles = (colors: any, isDark: boolean) =>
       color: colors.accent.purple,
       fontSize: 14,
       fontWeight: '600',
+    },
+
+    dayHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      marginBottom: 2,
+    },
+    dayLabel: {
+      color: colors.text.secondary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    dayTotal: {
+      color: colors.accent.purple,
+      fontSize: 13,
+      fontWeight: '700',
     },
   });

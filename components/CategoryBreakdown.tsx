@@ -21,21 +21,33 @@ interface CategoryBreakdownProps {
 
 const CATEGORY_COLORS: Record<string, string> = {
   Food: '#EF5350',
+  Groceries: '#4CAF50',
   Travel: '#42A5F5',
   Shopping: '#AB47BC',
   Bills: '#FFA726',
+  Recharge: '#FFCA28',
+  Study: '#5C6BC0',
   Health: '#26C6DA',
+  'Personal Care': '#EC407A',
+  Home: '#8D6E63',
   Entertainment: '#66BB6A',
+  Gifts: '#FF7043',
   Other: '#78909C',
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
   Food: 'restaurant-outline',
+  Groceries: 'cart-outline',
   Travel: 'bus-outline',
   Shopping: 'bag-outline',
   Bills: 'receipt-outline',
+  Recharge: 'flash-outline',
+  Study: 'book-outline',
   Health: 'medkit-outline',
+  'Personal Care': 'color-wand-outline',
+  Home: 'home-outline',
   Entertainment: 'film-outline',
+  Gifts: 'gift-outline',
   Other: 'ellipsis-horizontal-outline',
 };
 

@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { GlassBadge } from './GlassBadge';
 import { Debt } from '../hooks/useDebts';
 import { formatCurrency, formatDate, getDaysRemaining, isExpired } from '../utils/dateHelpers';
+import { getAvatarColor, hexToRgba } from '../utils/colorHelpers';
 
 interface DebtCardProps {
   debt: Debt;
@@ -19,14 +20,24 @@ export const DebtCard: React.FC<DebtCardProps> = ({ debt, onTogglePaid, onPress,
   const styles = getStyles(colors);
   const overdue = debt.dueDate ? isExpired(debt.dueDate) && !debt.isPaid : false;
   const daysRemaining = debt.dueDate ? getDaysRemaining(debt.dueDate) : null;
+  const avatarColor = getAvatarColor(debt.personName);
 
   return (
     <TouchableOpacity onPress={() => onPress?.(debt.id)} activeOpacity={0.85} style={[styles.card, debt.isPaid && styles.cardPaid]}>
       {/* Top Section */}
       <View style={styles.topRow}>
         <View style={styles.personRow}>
-          <View style={[styles.avatar, debt.isPaid && { opacity: 0.6 }]}>
-            <Text style={styles.avatarText}>{debt.personName.charAt(0).toUpperCase()}</Text>
+          <View style={[
+            styles.avatar, 
+            { 
+              backgroundColor: hexToRgba(avatarColor, 0.15), 
+              borderColor: hexToRgba(avatarColor, 0.3) 
+            },
+            debt.isPaid && { opacity: 0.6 }
+          ]}>
+            <Text style={[styles.avatarText, { color: avatarColor }]}>
+              {debt.personName.charAt(0).toUpperCase()}
+            </Text>
           </View>
           <View style={styles.personInfo}>
             <Text style={[styles.personName, debt.isPaid && styles.strike]}>{debt.personName}</Text>
@@ -104,8 +115,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   // Top Row
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   personRow: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255, 183, 77, 0.15)', borderWidth: 1, borderColor: 'rgba(255, 183, 77, 0.3)', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: colors.accent.amber, fontSize: 18, fontWeight: '700' },
+  avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 18, fontWeight: '700' },
   personInfo: { marginLeft: 12, flex: 1 },
   personName: { color: colors.text.primary, fontSize: 16, fontWeight: '700' },
   phone: { color: colors.text.muted, fontSize: 12, marginTop: 2 },

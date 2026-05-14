@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { GlassBadge } from './GlassBadge';
 import { Credit } from '../hooks/useCredits';
 import { formatCurrency, formatDate, getDaysRemaining, isExpired } from '../utils/dateHelpers';
+import { getAvatarColor, hexToRgba } from '../utils/colorHelpers';
 
 interface CreditCardProps {
   credit: Credit;
@@ -19,13 +20,23 @@ export const CreditCard: React.FC<CreditCardProps> = ({ credit, onMarkReturned, 
   const styles = getStyles(colors);
   const overdue = credit.expectedReturnDate ? isExpired(credit.expectedReturnDate) && !credit.isReturned : false;
   const daysRemaining = credit.expectedReturnDate ? getDaysRemaining(credit.expectedReturnDate) : null;
+  const avatarColor = getAvatarColor(credit.personName);
 
   return (
     <TouchableOpacity onPress={() => onPress?.(credit.id)} activeOpacity={0.85} style={[styles.card, credit.isReturned && styles.cardReturned]}>
       <View style={styles.topRow}>
         <View style={styles.personRow}>
-          <View style={[styles.avatar, credit.isReturned && { opacity: 0.6 }]}>
-            <Text style={styles.avatarText}>{credit.personName.charAt(0).toUpperCase()}</Text>
+          <View style={[
+            styles.avatar,
+            {
+              backgroundColor: hexToRgba(avatarColor, 0.15),
+              borderColor: hexToRgba(avatarColor, 0.3)
+            },
+            credit.isReturned && { opacity: 0.6 }
+          ]}>
+            <Text style={[styles.avatarText, { color: avatarColor }]}>
+              {credit.personName.charAt(0).toUpperCase()}
+            </Text>
           </View>
           <View style={styles.personInfo}>
             <Text style={[styles.personName, credit.isReturned && styles.strike]}>{credit.personName}</Text>
@@ -99,8 +110,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   cardReturned: { opacity: 0.65 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   personRow: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(102,187,106,0.15)', borderWidth: 1, borderColor: 'rgba(102,187,106,0.3)', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: colors.accent.green, fontSize: 18, fontWeight: '700' },
+  avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 18, fontWeight: '700' },
   personInfo: { marginLeft: 12, flex: 1 },
   personName: { color: colors.text.primary, fontSize: 16, fontWeight: '700' },
   phone: { color: colors.text.muted, fontSize: 12, marginTop: 2 },

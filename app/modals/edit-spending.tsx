@@ -15,7 +15,7 @@ import { useDailySpending } from '../../hooks/useDailySpending';
 import { formatShortDate } from '../../utils/dateHelpers';
 import { getCurrencyByCode } from '../../constants/currencies';
 
-const categories = ['Food', 'Travel', 'Shopping', 'Bills', 'Health', 'Entertainment', 'Other'];
+const categories = ['Food', 'Groceries', 'Travel', 'Shopping', 'Bills', 'Recharge', 'Study', 'Health', 'Personal Care', 'Home', 'Entertainment', 'Gifts', 'Other'];
 
 export default function EditSpendingModal() {
   const { colors, isDark } = useTheme();

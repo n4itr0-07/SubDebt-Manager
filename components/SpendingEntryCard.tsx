@@ -14,11 +14,17 @@ interface SpendingEntryCardProps {
 
 const CATEGORY_ICONS: Record<string, string> = {
   Food: 'restaurant-outline',
+  Groceries: 'cart-outline',
   Travel: 'bus-outline',
   Shopping: 'bag-outline',
   Bills: 'receipt-outline',
+  Recharge: 'flash-outline',
+  Study: 'book-outline',
   Health: 'medkit-outline',
+  'Personal Care': 'color-wand-outline',
+  Home: 'home-outline',
   Entertainment: 'film-outline',
+  Gifts: 'gift-outline',
   Other: 'ellipsis-horizontal-outline',
 };
 
